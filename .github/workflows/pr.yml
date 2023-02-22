@@ -1,0 +1,38 @@
+name: Check builds on PRs
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  build:
+    strategy:
+      matrix:
+        package:
+          - rye-pay
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    defaults:
+      run:
+        working-directory: ./packages/${{ matrix.package }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+      - run: yarn
+      - run: yarn test
+      - run: yarn build
+
+  check-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+      - run: yarn
+      - run: yarn check-format
