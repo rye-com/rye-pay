@@ -1,0 +1,15 @@
+# Since git v2.23 (August 2019), git-blame has a feature
+# to ignore or bypass certain commits.
+#
+# This file contains a list of commits that are not likely what you
+# are looking for in a blame, such as mass reformatting or renaming.
+#
+# These settings only apply once you've run an install once.
+#
+# `yarn install` will add this to your local tesseract/.git/config file
+#
+# Github actually will actually also take this specific file into account:
+#   https://docs.github.com/en/repositories/working-with-files/using-files/viewing-a-file#ignore-commits-in-the-blame-view
+
+# Format code with prettier
+88260b5caca33e0d4604296747b9e0ec690d8a49
