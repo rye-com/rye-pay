@@ -1,0 +1,23 @@
+{
+  "name": "public-packages",
+  "version": "0.1.0",
+  "description": "Repo for public packages. You can find all published packages [here](https://github.com/orgs/rye-com/packages).",
+  "main": "index.js",
+  "scripts": {
+    "check-format": "prettier --check \"**/*.ts\"",
+    "format": "prettier --write \"**/*.ts\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rye-com/public-packages.git"
+  },
+  "author": "Rye",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rye-com/public-packages/issues"
+  },
+  "homepage": "https://github.com/rye-com/public-packages#readme",
+  "devDependencies": {
+    "prettier": "^2.8.1"
+  }
+}
