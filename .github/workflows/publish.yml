@@ -1,35 +1,21 @@
-name: Publish packages to GitHub
+name: Publish package to npmjs
 on:
   release:
-    types: [created]
+    types: [published]
 jobs:
-  publish-npm:
-    strategy:
-      matrix:
-        package:
-          - rye-pay
+  build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./packages/${{ matrix.package }}
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v3
-      # Setup .npmrc file to publish to GitHub Packages
+      # Setup .npmrc file to publish to npm
       - uses: actions/setup-node@v3
         with:
           node-version: '16.x'
-          registry-url: 'https://npm.pkg.github.com'
+          registry-url: 'https://registry.npmjs.org'
           # Defaults to the user or organization that owns the workflow file
           scope: '@rye-com'
       - run: yarn
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: rm -f .npmrc
-      - run: yarn build
+      - run: yarn run build
       - run: yarn publish --access public
-        continue-on-error: true
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.RYE_NPM_TOKEN }}

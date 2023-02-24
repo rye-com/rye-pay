@@ -5,16 +5,9 @@ on:
       - main
 jobs:
   build:
-    strategy:
-      matrix:
-        package:
-          - rye-pay
     runs-on: ubuntu-latest
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    defaults:
-      run:
-        working-directory: ./packages/${{ matrix.package }}
     permissions:
       contents: read
       packages: write

@@ -94,12 +94,12 @@ interface SubmitAdditionalFields {
   last_name: string;
   month: string;
   year: string;
-  address1?: string;
+  address1: string;
   address2?: string;
-  city?: string;
-  state?: string;
-  zip?: string;
-  country?: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
 }
 
 interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
@@ -123,7 +123,19 @@ interface PromoCode {
 interface CartApiSubmitInput {
   id: string;
   token: string;
+  billingAddress: BillingAddress;
   // promoCodes?: PromoCode[]; TODO: uncomment once promo codes are supported by backend
+}
+
+interface BillingAddress {
+  firstName?: string;
+  lastName?: string;
+  address1?: string;
+  address2?: string;
+  city: string;
+  provinceCode?: string;
+  countryCode: string;
+  postalCode?: string;
 }
 
 export interface SubmitCartResult {
@@ -137,9 +149,8 @@ export interface SubmitStoreResult {
   requestId?: string;
 }
 export interface Store {
-  marketplace: Marketplace;
   store: string;
-  products: Product[];
+  cartLines: CartLine[];
 }
 
 export enum SubmitStoreStatus {
@@ -153,14 +164,14 @@ export enum Marketplace {
   SHOPIFY = 'SHOPIFY',
 }
 
-export type Product = AmazonProduct | ShopifyProduct;
+export type CartLine = AmazonCartLine | ShopifyCartLine;
 
-export interface AmazonProduct {
+export interface AmazonCartLine {
   quantity: number;
   productId: string;
 }
 
-export interface ShopifyProduct {
+export interface ShopifyCartLine {
   quantity: number;
   variantId: string;
 }
@@ -170,11 +181,33 @@ const prodCartApiEndpoint = '';
 const stageCartApiEndpoint = '';
 const localCartApiEndpoint = 'http://localhost:3000/graphql';
 
+const cartSubmitResponse = `
+id,
+stores {
+  status, 
+  requestId
+  store {
+    ... on AmazonStore {
+      store
+      cartLines {
+        quantity,
+        productId
+      }
+    }
+    ... on ShopifyStore {
+      store
+      cartLines {
+        quantity,
+        variantId
+      }
+    }
+  }
+}`;
+
 export class RyePay {
   private initialized = false;
   private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
-  private readonly submitCartMutation =
-    'mutation submitCart($input: SubmitCartInput!) { submitCart(input: $input) { id, stores { store { store, marketplace, products { ... on AmazonProduct { productId, quantity } ... on ShopifyProduct { variantId, quantity } } } , status, requestId } } } ';
+  private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private cartApiEndpoint = prodCartApiEndpoint;
   private spreedly!: Spreedly;
   private apiKey!: string;
@@ -344,6 +377,16 @@ export class RyePay {
     const input: CartApiSubmitInput = {
       token,
       id: paymentDetails.metadata.cartId,
+      billingAddress: {
+        firstName: paymentDetails.first_name,
+        lastName: paymentDetails.last_name,
+        address1: paymentDetails.address1,
+        address2: paymentDetails.address2,
+        city: paymentDetails.city,
+        countryCode: paymentDetails.country,
+        provinceCode: paymentDetails.state,
+        postalCode: paymentDetails.zip,
+      },
       // promoCodes: paymentDetails.metadata.promoCodes
       //   ? JSON.parse(paymentDetails.metadata.promoCodes)
       //   : undefined, TODO: uncomment once promo codes are supported by backend
