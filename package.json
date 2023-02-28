@@ -1,23 +1,27 @@
 {
-  "name": "public-packages",
-  "version": "0.1.0",
-  "description": "Repo for public packages. You can find all published packages [here](https://github.com/orgs/rye-com/packages).",
-  "main": "index.js",
-  "scripts": {
-    "check-format": "prettier --check \"**/*.ts\"",
-    "format": "prettier --write \"**/*.ts\""
-  },
+  "name": "@rye-com/rye-pay",
+  "version": "0.1.0-15",
+  "description": "This package contains the Rye payment client required to perform checkout using Rye Cart-API",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rye-com/public-packages.git"
+    "url": "https://github.com/rye-com/rye-pay"
   },
-  "author": "Rye",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "test": "echo \"There is no tests in this package\"",
+    "check-format": "prettier --check \"**/*.ts\"",
+    "format": "prettier --write \"**/*.ts\"",
+    "build": "tsc"
+  },
+  "author": "RYE",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/rye-com/public-packages/issues"
-  },
-  "homepage": "https://github.com/rye-com/public-packages#readme",
   "devDependencies": {
+    "typescript": "4.9.4",
     "prettier": "^2.8.1"
-  }
+  },
+  "files": [
+    "dist/"
+  ]
 }
