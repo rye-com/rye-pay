@@ -168,12 +168,16 @@ export type CartLine = AmazonCartLine | ShopifyCartLine;
 
 export interface AmazonCartLine {
   quantity: number;
-  productId: string;
+  product: {
+    id: string;
+  };
 }
 
 export interface ShopifyCartLine {
   quantity: number;
-  variantId: string;
+  variant: {
+    id: string;
+  };
 }
 
 // TODO RYE-1484 set correct urls
