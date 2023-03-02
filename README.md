@@ -3,30 +3,31 @@
 This package contains the Rye payment client required to perform checkout using Rye Cart-API. The package relays on Spreedly iFrame which takes care of handling secure payment data (credit card number and cvv).
 
 ## Table of Contents
+
 1. [Install](#install)
 2. [Usage](#usage)
-    - [Preparing a payment form](#preparing-a-payment-form)
-    - [RyePay initialization and cart submission](#ryepay-initialization-and-cart-submission)
-    - [Handle submission result](#handle-submission-result)
-    - [Other methods](#other-methods)
+   - [Preparing a payment form](#preparing-a-payment-form)
+   - [RyePay initialization and cart submission](#ryepay-initialization-and-cart-submission)
+   - [Handle submission result](#handle-submission-result)
+   - [Other methods](#other-methods)
 3. [Related documentation](#related-documentation)
 
 ## Install
 
 Install with npm:
 
-``` npm i @rye-com/rye-pay ```
+`npm i @rye-com/rye-pay`
 
 Install with yarn:
 
-``` yarn add @rye-com/rye-pay ```
+`yarn add @rye-com/rye-pay`
 
 ## Usage
 
 ### Preparing a payment form
 
 Developers are responsible for creating a form that collects user credit card data. It is up to a developer how to style and layout the form.
-In order to be PCI Complaint a developer should not use any input fields to collect a credit card number and cvv. 
+In order to be PCI Complaint a developer should not use any input fields to collect a credit card number and cvv.
 Instead, they should provide two HTML elements with `id` attribute where the number and cvv Spreedly iFrame fields should be rendered.
 
 ### RyePay initialization and cart submission
@@ -44,15 +45,15 @@ ryePay.submit(submitParams);
 
 `initParams` is an object with the following fields:
 
-`apiKey: string` <sup>required</sup> 
+`apiKey: string` <sup>required</sup>
 
 Developer's key to access Rye API.
 
-`numberEl: string` <sup>required</sup> 
+`numberEl: string` <sup>required</sup>
 
 Id of the HTML element where the number iFrame field should be rendered.
 
-`cvvEl: string` <sup>required</sup> 
+`cvvEl: string` <sup>required</sup>
 
 Id of the HTML element where the CVV iFrame field should be rendered.
 
@@ -98,7 +99,7 @@ cart identifier
 
 user's first name. Should match the name on the credit card.
 
-`last_name: string` <sup>required</sup> 
+`last_name: string` <sup>required</sup>
 
 user's last name. Should match the last name on the credit card.
 
@@ -135,6 +136,7 @@ billing country
 billing zip/postal code
 
 #### Handle submission result
+
 `onCartSubmitted` callback takes an argument of `SubmitCartResult` type that provides detail information about the cart submission status.
 
 ```ts
@@ -157,23 +159,27 @@ interface SubmitStoreResult {
 type Store = AmazonStore | ShopifyStore;
 
 interface AmazonStore {
-    store: string;
-    cartLines: AmazonCartLine[];
+  store: string;
+  cartLines: AmazonCartLine[];
 }
 
 interface ShopifyStore {
-    store: string;
-    cartLines: ShopifyCartLine[];
+  store: string;
+  cartLines: ShopifyCartLine[];
 }
 
-interface AmazonCartLine {
-    quantity: number;
-    productId: string;
+export interface AmazonCartLine {
+  quantity: number;
+  product: {
+    id: string;
+  };
 }
 
-interface ShopifyCartLine {
-    quantity: number;
-    variantId: string;
+export interface ShopifyCartLine {
+  quantity: number;
+  variant: {
+    id: string;
+  };
 }
 
 enum SubmitStoreStatus {
@@ -184,7 +190,6 @@ enum SubmitStoreStatus {
   // Other issues occurred during the submission
   FAILED = 'FAILED',
 }
-
 ```
 
 #### Other methods
