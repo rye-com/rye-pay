@@ -156,9 +156,35 @@ export interface SubmitStoreResult {
   status: SubmitStoreStatus;
   requestId?: string;
 }
-export interface Store {
+
+export type Store = AmazonStore | ShopifyStore;
+
+export interface AmazonStore {
   store: string;
-  cartLines: CartLine[];
+  cartLines: AmazonCartLine[];
+}
+
+export interface ShopifyStore {
+  store: string;
+  cartLines: ShopifyCartLine[];
+}
+
+export interface AmazonCartLine {
+  quantity: number;
+  product: AmazonProduct;
+}
+
+export interface AmazonProduct {
+  id: string;
+}
+
+export interface ShopifyCartLine {
+  quantity: number;
+  variant: ShopifyVariant;
+}
+
+export interface ShopifyVariant {
+  id: string;
 }
 
 export enum SubmitStoreStatus {
@@ -170,22 +196,6 @@ export enum SubmitStoreStatus {
 export enum Marketplace {
   AMAZON = 'AMAZON',
   SHOPIFY = 'SHOPIFY',
-}
-
-export type CartLine = AmazonCartLine | ShopifyCartLine;
-
-export interface AmazonCartLine {
-  quantity: number;
-  product: {
-    id: string;
-  };
-}
-
-export interface ShopifyCartLine {
-  quantity: number;
-  variant: {
-    id: string;
-  };
 }
 
 const prodCartApiEndpoint =
