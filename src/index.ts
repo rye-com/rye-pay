@@ -1,1 +1,1 @@
-export { RyePay } from './rye-pay';
+export * from './rye-pay';
