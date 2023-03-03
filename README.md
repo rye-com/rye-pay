@@ -135,6 +135,17 @@ billing country
 
 billing zip/postal code
 
+`selectedShippingOptions: SelectedShippingOption[]`
+
+an array of objects that represent selected shipping option per store
+
+```ts
+export interface SelectedShippingOption {
+  store: string;
+  shippingId: string;
+}
+```
+
 #### Handle submission result
 
 `onCartSubmitted` callback takes an argument of `SubmitCartResult` type that provides detail information about the cart submission status.
