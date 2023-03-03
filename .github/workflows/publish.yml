@@ -16,6 +16,9 @@ jobs:
           scope: '@rye-com'
       - run: yarn
       - run: yarn run build
+        env:
+          CART_API_STAGING_URL: ${{ env.CART_API_STAGING_URL }}
+          CART_API_PRODUCTION_URL: ${{ env.CART_API_PRODUCTION_URL }}
       - run: yarn publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.RYE_NPM_TOKEN }}

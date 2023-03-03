@@ -188,8 +188,11 @@ export interface ShopifyCartLine {
   };
 }
 
-const prodCartApiEndpoint = 'https://cart-core-subgraph-ggymj6kjkq-uc.a.run.app/graphql';
-const stageCartApiEndpoint = 'https://cart-core-subgraph-l46hfxmk6q-uc.a.run.app/graphql';
+const prodCartApiEndpoint =
+  process.env.CART_API_PRODUCTION_URL ??
+  'https://cart-core-subgraph-ggymj6kjkq-uc.a.run.app/graphql';
+const stageCartApiEndpoint =
+  process.env.CART_API_STAGING_URL ?? 'https://cart-core-subgraph-l46hfxmk6q-uc.a.run.app/graphql';
 const localCartApiEndpoint = 'http://localhost:3000/graphql';
 
 const cartSubmitResponse = `

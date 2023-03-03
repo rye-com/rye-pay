@@ -1,6 +1,6 @@
 {
   "name": "@rye-com/rye-pay",
-  "version": "0.1.0-21",
+  "version": "0.1.0-22",
   "description": "This package contains the Rye payment client required to perform checkout using Rye Cart-API",
   "repository": {
     "type": "git",
@@ -18,8 +18,9 @@
   "author": "RYE",
   "license": "ISC",
   "devDependencies": {
-    "typescript": "4.9.4",
-    "prettier": "^2.8.1"
+    "@types/node": "^18.14.4",
+    "prettier": "^2.8.1",
+    "typescript": "4.9.4"
   },
   "files": [
     "dist/"
