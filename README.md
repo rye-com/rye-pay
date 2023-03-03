@@ -16,11 +16,11 @@ This package contains the Rye payment client required to perform checkout using 
 
 Install with npm:
 
-`npm i @rye-com/rye-pay`
+`npm i @rye-api/rye-pay`
 
 Install with yarn:
 
-`yarn add @rye-com/rye-pay`
+`yarn add @rye-api/rye-pay`
 
 ## Usage
 
@@ -33,7 +33,7 @@ Instead, they should provide two HTML elements with `id` attribute where the num
 ### RyePay initialization and cart submission
 
 ```ts
-import { RyePay } from '@rye-com/rye-pay';
+import { RyePay } from '@rye-api/rye-pay';
 
 const ryePay = new RyePay();
 ryePay.init(initParams);
