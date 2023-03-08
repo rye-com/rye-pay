@@ -92,6 +92,7 @@ interface InitParams extends SpreedlyInitParams {
 interface SubmitAdditionalFields {
   first_name: string;
   last_name: string;
+  phone_number?: string;
   month: string;
   year: string;
   address1: string;
@@ -136,14 +137,15 @@ export interface SelectedShippingOption {
 }
 
 interface BillingAddress {
-  firstName?: string;
-  lastName?: string;
-  address1?: string;
+  firstName: string;
+  lastName: string;
+  address1: string;
   address2?: string;
   city: string;
-  provinceCode?: string;
-  countryCode: string;
-  postalCode?: string;
+  province: string;
+  country: string;
+  postalCode: string;
+  phone?: string;
 }
 
 export interface SubmitCartResult {
@@ -412,9 +414,10 @@ export class RyePay {
         address1: paymentDetails.address1,
         address2: paymentDetails.address2,
         city: paymentDetails.city,
-        countryCode: paymentDetails.country,
-        provinceCode: paymentDetails.state,
+        country: paymentDetails.country,
+        province: paymentDetails.state,
         postalCode: paymentDetails.zip,
+        phone: paymentDetails.phone_number,
       },
       selectedShippingOptions: paymentDetails.metadata.selectedShippingOptions
         ? JSON.parse(paymentDetails.metadata.selectedShippingOptions)
