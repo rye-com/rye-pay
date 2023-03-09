@@ -144,8 +144,8 @@ interface BillingAddress {
   address1: string;
   address2?: string;
   city: string;
-  province: string;
-  country: string;
+  provinceCode: string;
+  countryCode: string;
   postalCode: string;
   phone?: string;
 }
@@ -422,8 +422,8 @@ export class RyePay {
         address1: paymentDetails.address1,
         address2: paymentDetails.address2,
         city: paymentDetails.city,
-        country: paymentDetails.country,
-        province: paymentDetails.state,
+        countryCode: paymentDetails.country,
+        provinceCode: paymentDetails.state,
         postalCode: paymentDetails.zip,
         phone: paymentDetails.phone_number,
       },
