@@ -106,6 +106,7 @@ interface SubmitAdditionalFields {
 interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
+  shopperIp: string;
   // promoCodes: PromoCode[]; TODO: uncomment once promo codes are supported by backend
 }
 
@@ -114,6 +115,7 @@ interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
   metadata: {
     cartId: string;
     selectedShippingOptions?: string;
+    shopperIp: string;
     // promoCodes?: string; TODO: uncomment once promo codes are supported by backend
   };
 }
@@ -206,6 +208,7 @@ const prodCartApiEndpoint =
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://cart-core-subgraph-l46hfxmk6q-uc.a.run.app/graphql';
 const localCartApiEndpoint = 'http://localhost:3000/graphql';
+const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 const cartSubmitResponse = `
 id,
@@ -336,11 +339,16 @@ export class RyePay {
       throw new Error('cartId must be provided');
     }
 
+    if (!paymentDetails.shopperIp) {
+      throw new Error('shopperIp must be provided');
+    }
+
     this.spreedly.tokenizeCreditCard({
       ...paymentDetails,
       metadata: {
         cartId: paymentDetails.cartId,
         selectedShippingOptions: JSON.stringify(paymentDetails.selectedShippingOptions ?? []),
+        shopperIp: paymentDetails.shopperIp,
         // promoCodes: JSON.stringify(paymentDetails.promoCodes), TODO: uncomment once promo codes are supported by backend
       },
     });
@@ -432,6 +440,7 @@ export class RyePay {
       headers: {
         'Content-Type': 'application/json',
         Authorization: this.getBasicAuthHeader(),
+        [ryeShopperIpHeaderKey]: paymentDetails.metadata.shopperIp,
       },
       body: JSON.stringify({
         query: this.submitCartMutation,
