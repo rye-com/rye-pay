@@ -38,115 +38,119 @@ import { RyePay } from '@rye-api/rye-pay';
 const ryePay = new RyePay();
 ryePay.init(initParams);
 //...
-ryePay.submit(submitParams);
+ryePay.submit(paymentDetails);
 ```
 
-#### Initialization parameters
+### Initialization object `initParams`
 
 `initParams` is an object with the following fields:
 
-`apiKey: string` <sup>required</sup>
+> `apiKey: string` <sup>required</sup>
+>
+> Developer's key to access Rye API.
 
-Developer's key to access Rye API.
+> `numberEl: string` <sup>required</sup>
+>
+> Id of the HTML element where the number iFrame field should be rendered.
 
-`numberEl: string` <sup>required</sup>
+> `cvvEl: string` <sup>required</sup>
+>
+> Id of the HTML element where the CVV iFrame field should be rendered.
 
-Id of the HTML element where the number iFrame field should be rendered.
+> `onReady: () => void`
+>
+> Triggered when the iFrame is initialized and ready for configuration. setStyle and other UI function calls should be made within this event listener. This event will only fire after init() has been called.
 
-`cvvEl: string` <sup>required</sup>
+> `onCartSubmitted(result: SubmitCartResult)`
+>
+> Triggered when the cart submission is completed and an attempt to make a payment and create orders is made.
 
-Id of the HTML element where the CVV iFrame field should be rendered.
+> `onErrors: (errors) => void`
+>
+> Triggered when a payment method is not successfully tokenized. A description of the errors object can be found [here](https://docs.spreedly.com/reference/iframe/v1/#errors)
 
-`onReady: () => void`
+> `onIFrameError: (error) => void`
+>
+> Triggered when a javascript error occurs within the iFrame. This is useful for debugging runtime issues. `error` includes keys `msg`, `url`, `line`, `col`
 
-Triggered when the iFrame is initialized and ready for configuration. setStyle and other UI function calls should be made within this event listener. This event will only fire after init() has been called.
+> `onFieldChanged: (name, type, activeEl, inputProperties) => void`
+>
+> Triggered when an input event occurs in either iFrame field. This is useful to provide real-time feedback to the user. A description of params can be found [here](https://docs.spreedly.com/reference/iframe/v1/#fieldevent)
 
-`onCartSubmitted(result: SubmitCartResult)`
+> `onValidate: (inputProperties) => void`
+>
+> Triggered when validation of the iFrame is requested. This event will only fire after validate() has been called. A description of input properties can be found [here](https://docs.spreedly.com/reference/iframe/v1/#validation)
 
-Triggered when the cart submission is completed and an attempt to make a payment and create orders is made.
+> `enableLogging: boolean`
+>
+> Indicates whether to log to the console the crucial steps of the script execution. Helpful for debugging.
 
-`onErrors: (errors) => void`
+### Payment details object `paymentDetails`:
 
-Triggered when a payment method is not successfully tokenized. A description of the errors object can be found [here](https://docs.spreedly.com/reference/iframe/v1/#errors)
+As soon as the user filled the payment form and the cart is ready to be submitted, the developer should call `ryePay.submit(paymentDetails)`. To handle the result the developer should provide `onCartSubmitted` callback in the `init` method. This method will submit the cart, make a payment transaction using specified credit card data and create an order per each store in the cart.
 
-`onIFrameError: (error) => void`
+`paymentDetails` is an object with the following fields:
 
-Triggered when a javascript error occurs within the iFrame. This is useful for debugging runtime issues. `error` includes keys `msg`, `url`, `line`, `col`
+> `cartId: string` <sup>required</sup>
+>
+> cart identifier
 
-`onFieldChanged: (name, type, activeEl, inputProperties) => void`
+> `shopperIp: string` <sup>required</sup>
+>
+> IP of the user of whose behalf the submit is made (end buyer IP), a valide IPV4 string
 
-Triggered when an input event occurs in either iFrame field. This is useful to provide real-time feedback to the user. A description of params can be found [here](https://docs.spreedly.com/reference/iframe/v1/#fieldevent)
+> `first_name: string` <sup>required</sup>
+>
+> user's first name. Should match the name on the credit card.
 
-`onValidate: (inputProperties) => void`
+> `last_name: string` <sup>required</sup>
+>
+> user's last name. Should match the last name on the credit card.
 
-Triggered when validation of the iFrame is requested. This event will only fire after validate() has been called. A description of input properties can be found [here](https://docs.spreedly.com/reference/iframe/v1/#validation)
+> `month: string` <sup>required</sup>
+>
+> credit card expiration month
 
-`enableLogging: boolean`
+> `year: string` <sup>required</sup>
+>
+> credit card expiration year
 
-Indicates whether to log to the console the crucial steps of the script execution. Helpful for debugging.
+> `address1: string` <sup>required</sup>
+>
+> billing address.
 
-#### Submit parameters
+> `address2: string`
+>
+> additional billing address
 
-As soon as the user filled the payment form and the cart is ready to be submitted, the developer should call `ryePay.submit(submitParams)`. To handle the result the developer should provide `onCartSubmitted` callback in the `init` method. This method will submit the cart, make a payment transaction using specified credit card data and create an order per each store in the cart.
+> `city: string` <sup>required</sup>
+>
+> billing city
 
-`submitParams` is an object with the following fields:
+> `state: string` <sup>required</sup>
+>
+> billing state/province
 
-`cartId: string` <sup>required</sup>
+> `country: string` <sup>required</sup>
+>
+> billing country
 
-cart identifier
+> `zip: string` <sup>required</sup>
+>
+> billing zip/postal code
 
-`first_name: string` <sup>required</sup>
+> `selectedShippingOptions: SelectedShippingOption[]`
+>
+> an array of objects that represent selected shipping option per store
+>
+> ```ts
+> export interface SelectedShippingOption {
+>   store: string;
+>   shippingId: string;
+> }
+> ```
 
-user's first name. Should match the name on the credit card.
-
-`last_name: string` <sup>required</sup>
-
-user's last name. Should match the last name on the credit card.
-
-`month: string` <sup>required</sup>
-
-credit card expiration month
-
-`year: string` <sup>required</sup>
-
-credit card expiration year
-
-`address1: string` <sup>required</sup>
-
-billing address.
-
-`address2: string`
-
-additional billing address
-
-`city: string` <sup>required</sup>
-
-billing city
-
-`state: string` <sup>required</sup>
-
-billing state/province
-
-`country: string` <sup>required</sup>
-
-billing country
-
-`zip: string` <sup>required</sup>
-
-billing zip/postal code
-
-`selectedShippingOptions: SelectedShippingOption[]`
-
-an array of objects that represent selected shipping option per store
-
-```ts
-export interface SelectedShippingOption {
-  store: string;
-  shippingId: string;
-}
-```
-
-#### Handle submission result
+### Handle submission result
 
 `onCartSubmitted` callback takes an argument of `SubmitCartResult` type that provides detail information about the cart submission status.
 
@@ -203,7 +207,7 @@ enum SubmitStoreStatus {
 }
 ```
 
-#### Other methods
+### Other methods
 
 Methods described below are a direct mapping to the Spreedly object. A detailed description can be found [here](https://docs.spreedly.com/reference/iframe/v1/#ui)
 
