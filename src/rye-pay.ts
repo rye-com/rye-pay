@@ -371,15 +371,15 @@ export class RyePay {
     this.spreedly.setFieldType(field, type);
   }
 
-  setLabel(field: FrameField, label: FieldType) {
+  setLabel(field: FrameField, label: string) {
     this.spreedly.setLabel(field, label);
   }
 
-  setTitle(field: FrameField, title: FieldType) {
+  setTitle(field: FrameField, title: string) {
     this.spreedly.setTitle(field, title);
   }
 
-  setPlaceholder(field: FrameField, placeholder: FieldType) {
+  setPlaceholder(field: FrameField, placeholder: string) {
     this.spreedly.setPlaceholder(field, placeholder);
   }
   setValue(field: FrameField, value: number) {
