@@ -109,11 +109,11 @@ As soon as the user filled the payment form and the cart is ready to be submitte
 
 > `month: string` <sup>required</sup>
 >
-> credit card expiration month
+> credit card expiration month in MM format
 
 > `year: string` <sup>required</sup>
 >
-> credit card expiration year
+> credit card expiration year in YYYY format
 
 > `address1: string` <sup>required</sup>
 >
