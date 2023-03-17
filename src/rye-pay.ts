@@ -151,14 +151,54 @@ interface BillingAddress {
 }
 
 export interface SubmitCartResult {
-  id: string;
-  stores: SubmitStoreResult[];
+  cart: {
+    id: string;
+    stores: SubmitStoreResult[];
+  };
+  errors: SubmitCartResultError[];
 }
 
 export interface SubmitStoreResult {
   store: Store;
   status: SubmitStoreStatus;
   requestId?: string;
+  errors: SubmitStoreResultError[];
+}
+
+export interface SubmitCartResultError {
+  code: SubmitCartResultErrorCode;
+  message: string;
+}
+export interface SubmitStoreResultError {
+  code: SubmitStoreResultErrorCode;
+  message: string;
+}
+
+export enum SubmitStoreResultErrorCode {
+  SUBMIT_STORE_FAILED = 'SUBMIT_STORE_FAILED',
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+}
+
+export enum SubmitCartResultErrorCode {
+  SUBMIT_CART_FAILED = 'SUBMIT_CART_FAILED',
+  BUYER_IDENTITY_MISSING = 'BUYER_IDENTITY_MISSING',
+  BUYER_IDENTITY_INVALID_FIRST_NAME = 'BUYER_IDENTITY_INVALID_FIRST_NAME',
+  BUYER_IDENTITY_INVALID_LAST_NAME = 'BUYER_IDENTITY_INVALID_LAST_NAME',
+  BUYER_IDENTITY_INVALID_ADDRESS = 'BUYER_IDENTITY_INVALID_ADDRESS',
+  BUYER_IDENTITY_INVALID_CITY = 'BUYER_IDENTITY_INVALID_CITY',
+  BUYER_IDENTITY_INVALID_PROVINCE = 'BUYER_IDENTITY_INVALID_PROVINCE',
+  BUYER_IDENTITY_INVALID_COUNTRY = 'BUYER_IDENTITY_INVALID_COUNTRY',
+  BUYER_IDENTITY_INVALID_POSTAL_CODE = 'BUYER_IDENTITY_INVALID_POSTAL_CODE',
+  BUYER_IDENTITY_INVALID_PHONE = 'BUYER_IDENTITY_INVALID_PHONE',
+  BUYER_IDENTITY_INVALID_EMAIL = 'BUYER_IDENTITY_INVALID_EMAIL',
+  BILLING_ADDRESS_INVALID_FIRST_NAME = 'BILLING_ADDRESS_INVALID_FIRST_NAME',
+  BILLING_ADDRESS_INVALID_LAST_NAME = 'BILLING_ADDRESS_INVALID_LAST_NAME',
+  BILLING_ADDRESS_INVALID_ADDRESS = 'BILLING_ADDRESS_INVALID_ADDRESS',
+  BILLING_ADDRESS_INVALID_CITY = 'BILLING_ADDRESS_INVALID_CITY',
+  BILLING_ADDRESS_INVALID_PROVINCE = 'BILLING_ADDRESS_INVALID_PROVINCE',
+  BILLING_ADDRESS_INVALID_COUNTRY = 'BILLING_ADDRESS_INVALID_COUNTRY',
+  BILLING_ADDRESS_INVALID_PHONE = 'BILLING_ADDRESS_INVALID_PHONE',
+  BILLING_ADDRESS_INVALID_POSTAL_CODE = 'BILLING_ADDRESS_INVALID_POSTAL_CODE',
 }
 
 export type Store = AmazonStore | ShopifyStore;
@@ -211,31 +251,42 @@ const localCartApiEndpoint = 'http://localhost:3000/graphql';
 const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 const cartSubmitResponse = `
-id,
-stores {
-  status, 
-  requestId
-  store {
-    ... on AmazonStore {
-      store
-      cartLines {
-        quantity,
-        product {
-          id
+cart {
+  id,
+  stores {
+    status, 
+    requestId
+    store {
+      ... on AmazonStore {
+        store
+        cartLines {
+          quantity,
+          product {
+            id
+          }
+        }
+      }
+      ... on ShopifyStore {
+        store
+        cartLines {
+          quantity,
+          variant {
+            id
+          }
         }
       }
     }
-    ... on ShopifyStore {
-      store
-      cartLines {
-        quantity,
-        variant {
-          id
-        }
-      }
+    errors {
+      code
+      message
     }
-  }
-}`;
+  }  
+}
+errors {
+  code
+  message
+}
+`;
 
 export class RyePay {
   private initialized = false;

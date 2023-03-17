@@ -156,10 +156,14 @@ As soon as the user filled the payment form and the cart is ready to be submitte
 
 ```ts
 interface SubmitCartResult {
-  // Cart identifier
-  id: string;
-  // Submission result per each store in the cart
-  stores: SubmitStoreResult[];
+  cart: {
+    // Cart identifier
+    id: string;
+    // Submission result per each store in the cart
+    stores: SubmitStoreResult[];
+  };
+  // Common submit errors
+  errors: SubmitCartResultError[];
 }
 
 interface SubmitStoreResult {
@@ -169,6 +173,45 @@ interface SubmitStoreResult {
   status: SubmitStoreStatus;
   // Identifier of the request to track order status
   requestId?: string;
+  // Store specific errors
+  errors: SubmitStoreResultError[];
+}
+
+interface SubmitCartResultError {
+  code: SubmitCartResultErrorCode;
+  message: string;
+}
+
+interface SubmitStoreResultError {
+  code: SubmitStoreResultErrorCode;
+  message: string;
+}
+
+enum SubmitStoreResultErrorCode {
+  SUBMIT_STORE_FAILED = 'SUBMIT_STORE_FAILED',
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+}
+
+enum SubmitCartResultErrorCode {
+  SUBMIT_CART_FAILED = 'SUBMIT_CART_FAILED',
+  BUYER_IDENTITY_MISSING = 'BUYER_IDENTITY_MISSING',
+  BUYER_IDENTITY_INVALID_FIRST_NAME = 'BUYER_IDENTITY_INVALID_FIRST_NAME',
+  BUYER_IDENTITY_INVALID_LAST_NAME = 'BUYER_IDENTITY_INVALID_LAST_NAME',
+  BUYER_IDENTITY_INVALID_ADDRESS = 'BUYER_IDENTITY_INVALID_ADDRESS',
+  BUYER_IDENTITY_INVALID_CITY = 'BUYER_IDENTITY_INVALID_CITY',
+  BUYER_IDENTITY_INVALID_PROVINCE = 'BUYER_IDENTITY_INVALID_PROVINCE',
+  BUYER_IDENTITY_INVALID_COUNTRY = 'BUYER_IDENTITY_INVALID_COUNTRY',
+  BUYER_IDENTITY_INVALID_POSTAL_CODE = 'BUYER_IDENTITY_INVALID_POSTAL_CODE',
+  BUYER_IDENTITY_INVALID_PHONE = 'BUYER_IDENTITY_INVALID_PHONE',
+  BUYER_IDENTITY_INVALID_EMAIL = 'BUYER_IDENTITY_INVALID_EMAIL',
+  BILLING_ADDRESS_INVALID_FIRST_NAME = 'BILLING_ADDRESS_INVALID_FIRST_NAME',
+  BILLING_ADDRESS_INVALID_LAST_NAME = 'BILLING_ADDRESS_INVALID_LAST_NAME',
+  BILLING_ADDRESS_INVALID_ADDRESS = 'BILLING_ADDRESS_INVALID_ADDRESS',
+  BILLING_ADDRESS_INVALID_CITY = 'BILLING_ADDRESS_INVALID_CITY',
+  BILLING_ADDRESS_INVALID_PROVINCE = 'BILLING_ADDRESS_INVALID_PROVINCE',
+  BILLING_ADDRESS_INVALID_COUNTRY = 'BILLING_ADDRESS_INVALID_COUNTRY',
+  BILLING_ADDRESS_INVALID_PHONE = 'BILLING_ADDRESS_INVALID_PHONE',
+  BILLING_ADDRESS_INVALID_POSTAL_CODE = 'BILLING_ADDRESS_INVALID_POSTAL_CODE',
 }
 
 type Store = AmazonStore | ShopifyStore;
