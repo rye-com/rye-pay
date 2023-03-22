@@ -74,7 +74,7 @@ interface InitParams extends SpreedlyInitParams {
   apiKey: string;
   numberEl: string;
   cvvEl: string;
-  onReady?: () => void;
+  onReady?: (spreedly: Spreedly) => void;
   onErrors?: (errors: SpreedlyError[]) => void;
   onCartSubmitted?: (cart: SubmitCartResult) => void;
   onIFrameError?: (error: FrameError) => void;
@@ -355,7 +355,7 @@ export class RyePay {
       this.log(`envToken: ${envToken}`);
 
       // Subscribe to optional events only if developers wants to handle them
-      onReady && this.spreedly.on('ready', onReady);
+      onReady && this.spreedly.on('ready', () => onReady(this.spreedly));
       onFieldChanged && this.spreedly.on('fieldEvent', onFieldChanged);
       onValidate && this.spreedly.on('validation', onValidate);
       onIFrameError && this.spreedly.on('consoleError', onIFrameError);

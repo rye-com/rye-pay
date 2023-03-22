@@ -57,9 +57,9 @@ ryePay.submit(paymentDetails);
 >
 > Id of the HTML element where the CVV iFrame field should be rendered.
 
-> `onReady: () => void`
+> `onReady: (spreedly: Spreedly) => void`
 >
-> Triggered when the iFrame is initialized and ready for configuration. setStyle and other UI function calls should be made within this event listener. This event will only fire after init() has been called.
+> Triggered when the iFrame is initialized and ready for configuration. setStyle and other UI function calls should be made within this event listener. This event will only fire after init() has been called. Original Spreedly object is passed as a callback parameter.
 
 > `onCartSubmitted(result: SubmitCartResult)`
 >
