@@ -107,6 +107,10 @@ As soon as the user filled the payment form and the cart is ready to be submitte
 >
 > user's last name. Should match the last name on the credit card.
 
+> `phone_number` <sup>required</sup>
+>
+> user's phone number
+
 > `month: string` <sup>required</sup>
 >
 > credit card expiration month in MM format
