@@ -76,6 +76,7 @@ ryePay.submit(paymentDetails);
 > `onFieldChanged: (name, type, activeEl, inputProperties) => void`
 >
 > Triggered when an input event occurs in either iFrame field. This is useful to provide real-time feedback to the user. A description of params can be found [here](https://docs.spreedly.com/reference/iframe/v1/#fieldevent)
+> Note: `inputProperties` is only populated on the `input` event type.
 
 > `onValidate: (inputProperties) => void`
 >
@@ -254,7 +255,11 @@ enum SubmitStoreStatus {
 }
 ```
 
-### Other methods
+### Other methods and fields
+
+> `initialized: boolean`
+>
+> Indicates whether the RyePay has been initialized.
 
 Methods described below are a direct mapping to the Spreedly object. A detailed description can be found [here](https://docs.spreedly.com/reference/iframe/v1/#ui)
 
