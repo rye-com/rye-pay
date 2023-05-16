@@ -82,7 +82,7 @@ interface InitParams extends SpreedlyInitParams {
     name: FrameField,
     type: FrameEventType,
     activeEl: FrameField,
-    inputProperties: InputProperties
+    inputProperties: Partial<InputProperties>
   ) => void;
   onValidate?: (inputProperties: InputProperties) => void;
   enableLogging?: boolean;
@@ -289,7 +289,7 @@ errors {
 `;
 
 export class RyePay {
-  private initialized = false;
+  private initializing = false;
   private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private cartApiEndpoint = prodCartApiEndpoint;
@@ -297,6 +297,14 @@ export class RyePay {
   private apiKey!: string;
   private enableLogging: boolean = false;
 
+  /**
+   * Indicates whether the RyePay has been initialized.
+   */
+  public initialized = false;
+
+  /**
+   * Initializes RyePay. This method should be called before calling any other methods of RyePay.
+   */
   init({
     apiKey,
     numberEl,
@@ -310,10 +318,14 @@ export class RyePay {
     enableLogging = false,
     environment = 'prod',
   }: InitParams) {
-    if (this.initialized) {
+    if (this.initializing) {
       return;
     }
-    this.initialized = true;
+    if (this.initialized) {
+      this.reload();
+      return;
+    }
+    this.initializing = true;
 
     if (!apiKey) {
       const errorMsg = "apiKey can't be blank";
@@ -376,6 +388,8 @@ export class RyePay {
         cvvEl,
       });
 
+      this.initializing = false;
+      this.initialized = true;
       this.log('Spreedly initialized');
     };
 
@@ -385,6 +399,10 @@ export class RyePay {
     this.log('RyePay initialized');
   }
 
+  /**
+   * Submits payment details to Rye API. As an intermediate step, the method tokenizes credit card data using Spreedly service.
+   * @param paymentDetails
+   */
   submit(paymentDetails: RyeSubmitAdditionalFields) {
     if (!paymentDetails.cartId) {
       throw new Error('cartId must be provided');
@@ -405,46 +423,86 @@ export class RyePay {
     });
   }
 
+  /**
+   * Reload the iFrame library. This resets and re-initializes all iFrame elements and state and is a convenient way to quickly reset the form.
+   * When reload is complete, the ready event will be fired, at which time the iFrame can be customized.
+   */
   reload() {
     this.spreedly.reload();
   }
 
+  /**
+   * Request iFrame fields to report their validation status. Useful for real-time validation functionality.
+   */
   validate() {
     this.spreedly.validate();
   }
 
   // Field customization methods
+
+  /**
+   * Style iFrame fields using CSS.
+   */
   setStyle(field: FrameField, style: string) {
     this.spreedly.setStyle(field, style);
   }
 
+  /**
+   * Set the input type of the iFrame fields. This is useful to when you want different keyboards to display on mobile devices.
+   */
   setFieldType(field: FrameField, type: FieldType) {
     this.spreedly.setFieldType(field, type);
   }
 
+  /**
+   * Style iFrame fields’ label. Although the label for each iFrame field is not displayed, it is still used by screen readers and other accessibility devices.
+   */
   setLabel(field: FrameField, label: string) {
     this.spreedly.setLabel(field, label);
   }
 
+  /**
+   * Set custom iFrame fields’ title attribute. Although the title for each iFrame field is not displayed,
+   * it can still be used by screen readers and other accessibility devices.
+   */
   setTitle(field: FrameField, title: string) {
     this.spreedly.setTitle(field, title);
   }
 
+  /**
+   * Style iFrame fields’ placeholder text.
+   */
   setPlaceholder(field: FrameField, placeholder: string) {
     this.spreedly.setPlaceholder(field, placeholder);
   }
+
+  /**
+   * Set the value the iFrame fields to a known test value. Any values that are not on the allowed list will be silently rejected.
+   */
   setValue(field: FrameField, value: number) {
     this.spreedly.setValue(field, value);
   }
 
+  /**
+   * Set the card number format. If set to prettyFormat, the card number value will include spaces in the credit card number as they appear on a physical card.
+   * The number field must be set to type text or tel for pretty formatting to take effect.
+   */
   setNumberFormat(format: NumberFormat) {
     this.spreedly.setNumberFormat(format);
   }
 
+  /**
+   * Toggle autocomplete functionality for card number and cvv fields.
+   * By default, the autocomplete attribute is enabled, so the first call of this function will disable autocomplete
+   */
   toggleAutoComplete() {
     this.spreedly.toggleAutoComplete();
   }
 
+  /**
+   * Set the cursor focus to one of the iFrame fields. This is useful if you want to load your form with the card number field already in focus,
+   * or if you want to auto-focus one of the iFrame fields if they contain an input error.
+   */
   transferFocus(field: FrameField) {
     this.spreedly.transferFocus(field);
   }
