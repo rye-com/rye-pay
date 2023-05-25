@@ -71,7 +71,8 @@ type Environment = 'prod' | 'stage' | 'local';
 
 // RyePay params for init method
 interface InitParams extends SpreedlyInitParams {
-  apiKey: string;
+  apiKey?: string;
+  generateJWT?: () => Promise<string>;
   numberEl: string;
   cvvEl: string;
   onReady?: (spreedly: Spreedly) => void;
@@ -148,6 +149,10 @@ interface BillingAddress {
   countryCode: string;
   postalCode: string;
   phone?: string;
+}
+
+export interface EnvTokenResult {
+  token: string;
 }
 
 export interface SubmitCartResult {
@@ -292,9 +297,15 @@ export class RyePay {
   private initializing = false;
   private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
+  private readonly envTokenQuery = `query {
+    environmentToken {
+       token
+    }
+  }`;
   private cartApiEndpoint = prodCartApiEndpoint;
   private spreedly!: Spreedly;
-  private apiKey!: string;
+  private apiKey?: string;
+  private generateJWT?: () => Promise<string>;
   private enableLogging: boolean = false;
 
   /**
@@ -307,6 +318,7 @@ export class RyePay {
    */
   init({
     apiKey,
+    generateJWT,
     numberEl,
     cvvEl,
     onReady,
@@ -327,12 +339,17 @@ export class RyePay {
     }
     this.initializing = true;
 
-    if (!apiKey) {
-      const errorMsg = "apiKey can't be blank";
+    if (!apiKey && !generateJWT) {
+      const errorMsg = 'Either apiKey or generateJWT must be provided';
       if (onErrors) {
         onErrors([
           {
             attribute: 'apiKey',
+            key: 'errors.blank',
+            message: errorMsg,
+          },
+          {
+            attribute: 'generateJWT',
             key: 'errors.blank',
             message: errorMsg,
           },
@@ -347,6 +364,7 @@ export class RyePay {
     }
 
     this.apiKey = apiKey;
+    this.generateJWT = generateJWT;
     this.enableLogging = enableLogging;
     this.cartApiEndpoint = this.getCartApiEndpoint(environment);
 
@@ -363,7 +381,9 @@ export class RyePay {
       }
 
       this.spreedly = (globalThis as any).Spreedly;
-      const envToken = await this.getEnvToken();
+      // TODO: eventually we need drop getEnvTokenRest. Currently it's used only for backward
+      // compatibility.
+      const envToken = this.apiKey ? await this.getEnvTokenRest() : await this.getEnvToken();
       this.log(`envToken: ${envToken}`);
 
       // Subscribe to optional events only if developers wants to handle them
@@ -508,13 +528,29 @@ export class RyePay {
   }
 
   private getEnvToken = async () => {
+    const rawResponse = await fetch(this.cartApiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: await this.getAuthHeader(),
+      },
+      body: JSON.stringify({
+        query: this.envTokenQuery,
+      }),
+    });
+    const content = await rawResponse.json();
+    const result: EnvTokenResult = content?.data?.environmentToken;
+    return result.token;
+  };
+
+  private getEnvTokenRest = async () => {
     const origin = new URL(this.cartApiEndpoint).origin;
     const url = `${origin}/v1/spreedly/env-token`;
     const rawResponse = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: this.getBasicAuthHeader(),
+        Authorization: await this.getAuthHeader(),
       },
     });
     const content = await rawResponse.json();
@@ -548,7 +584,7 @@ export class RyePay {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: this.getBasicAuthHeader(),
+        Authorization: await this.getAuthHeader(),
         [ryeShopperIpHeaderKey]: paymentDetails.metadata.shopperIp,
       },
       body: JSON.stringify({
@@ -567,8 +603,14 @@ export class RyePay {
     return !!(globalThis as any).Spreedly;
   }
 
-  private getBasicAuthHeader() {
-    return 'Basic ' + btoa(this.apiKey + ':');
+  private async getAuthHeader() {
+    if (this.apiKey) {
+      return 'Basic ' + btoa(this.apiKey + ':');
+    }
+
+    const token = await this.generateJWT!();
+
+    return `Bearer ${token}`;
   }
 
   private log = (...args: any) => {
