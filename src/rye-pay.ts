@@ -248,10 +248,9 @@ export enum Marketplace {
 }
 
 const prodCartApiEndpoint =
-  process.env.CART_API_PRODUCTION_URL ??
-  'https://cart-core-subgraph-ggymj6kjkq-uc.a.run.app/graphql';
+  process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
-  process.env.CART_API_STAGING_URL ?? 'https://cart-core-subgraph-l46hfxmk6q-uc.a.run.app/graphql';
+  process.env.CART_API_STAGING_URL ?? 'https://rye-federation-l46hfxmk6q-uc.a.run.app/v1/query';
 const localCartApiEndpoint = 'http://localhost:3000/graphql';
 const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
