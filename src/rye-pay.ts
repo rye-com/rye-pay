@@ -380,9 +380,7 @@ export class RyePay {
       }
 
       this.spreedly = (globalThis as any).Spreedly;
-      // TODO: eventually we need drop getEnvTokenRest. Currently it's used only for backward
-      // compatibility.
-      const envToken = this.apiKey ? await this.getEnvTokenRest() : await this.getEnvToken();
+      const envToken = await this.getEnvToken();
       this.log(`envToken: ${envToken}`);
 
       // Subscribe to optional events only if developers wants to handle them
@@ -540,20 +538,6 @@ export class RyePay {
     const content = await rawResponse.json();
     const result: EnvTokenResult = content?.data?.environmentToken;
     return result.token;
-  };
-
-  private getEnvTokenRest = async () => {
-    const origin = new URL(this.cartApiEndpoint).origin;
-    const url = `${origin}/v1/spreedly/env-token`;
-    const rawResponse = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: await this.getAuthHeader(),
-      },
-    });
-    const content = await rawResponse.json();
-    return content?.token;
   };
 
   private async submitCart(token: string, paymentDetails: SpreedlyAdditionalFields) {
