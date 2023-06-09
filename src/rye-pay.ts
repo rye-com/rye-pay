@@ -107,7 +107,7 @@ interface SubmitAdditionalFields {
 interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
-  shopperIp: string;
+  shopperIp?: string;
   // promoCodes: PromoCode[]; TODO: uncomment once promo codes are supported by backend
 }
 
@@ -116,7 +116,7 @@ interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
   metadata: {
     cartId: string;
     selectedShippingOptions?: string;
-    shopperIp: string;
+    shopperIp?: string;
     // promoCodes?: string; TODO: uncomment once promo codes are supported by backend
   };
 }
@@ -250,7 +250,7 @@ export enum Marketplace {
 const prodCartApiEndpoint =
   process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
-  process.env.CART_API_STAGING_URL ?? 'https://rye-federation-l46hfxmk6q-uc.a.run.app/v1/query';
+  process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
 const localCartApiEndpoint = 'http://localhost:3000/graphql';
 const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
@@ -425,10 +425,6 @@ export class RyePay {
       throw new Error('cartId must be provided');
     }
 
-    if (!paymentDetails.shopperIp) {
-      throw new Error('shopperIp must be provided');
-    }
-
     this.spreedly.tokenizeCreditCard({
       ...paymentDetails,
       metadata: {
@@ -563,13 +559,18 @@ export class RyePay {
       //   : undefined, TODO: uncomment once promo codes are supported by backend
     };
 
+    const headers: RequestInit['headers'] = {
+      'Content-Type': 'application/json',
+      Authorization: await this.getAuthHeader(),
+    };
+
+    if (paymentDetails.metadata.shopperIp) {
+      headers[ryeShopperIpHeaderKey] = paymentDetails.metadata.shopperIp;
+    }
+
     const rawResponse = await fetch(this.cartApiEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: await this.getAuthHeader(),
-        [ryeShopperIpHeaderKey]: paymentDetails.metadata.shopperIp,
-      },
+      headers,
       body: JSON.stringify({
         query: this.submitCartMutation,
         variables: {
