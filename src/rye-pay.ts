@@ -77,7 +77,7 @@ interface InitParams extends SpreedlyInitParams {
   cvvEl: string;
   onReady?: (spreedly: Spreedly) => void;
   onErrors?: (errors: SpreedlyError[]) => void;
-  onCartSubmitted?: (submitCartResult: SubmitCartResult) => void;
+  onCartSubmitted?: (submitCartResult?: SubmitCartResult, errors?: Error[]) => void;
   onIFrameError?: (error: FrameError) => void;
   onFieldChanged?: (
     name: FrameField,
@@ -155,18 +155,13 @@ export interface EnvTokenResult {
   token: string;
 }
 
-export type SubmitCartResult =
-  | {
-      cart: {
-        id: string;
-        stores: SubmitStoreResult[];
-      };
-      errors: SubmitCartResultError[];
-    }
-  | {
-      data: null;
-      errors: Error[];
-    };
+export interface SubmitCartResult {
+  cart: {
+    id: string;
+    stores: SubmitStoreResult[];
+  };
+  errors: SubmitCartResultError[];
+}
 
 export interface SubmitStoreResult {
   store: Store;
@@ -401,7 +396,7 @@ export class RyePay {
         async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
           this.log(`payment method token: ${token}`);
           const result = await this.submitCart(token, paymentDetails);
-          onCartSubmitted?.(result);
+          onCartSubmitted?.(result.submitCart, result.errors);
         }
       );
 
@@ -584,7 +579,10 @@ export class RyePay {
       }),
     });
     const content = await rawResponse.json();
-    const result: SubmitCartResult = content?.data?.submitCart ?? content;
+    const result = {
+      submitCart: content?.data?.submitCart as SubmitCartResult,
+      errors: content.errors as Error[],
+    };
     return result;
   }
 
