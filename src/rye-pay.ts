@@ -37,6 +37,10 @@ interface FrameError {
   col: number;
 }
 
+interface GraphQLError {
+  message: string;
+}
+
 // iFrame field properties used for validation and tracking changes
 interface InputProperties {
   cardType: string; // The type (brand) of the card. One of supported card identifiers.
@@ -77,7 +81,7 @@ interface InitParams extends SpreedlyInitParams {
   cvvEl: string;
   onReady?: (spreedly: Spreedly) => void;
   onErrors?: (errors: SpreedlyError[]) => void;
-  onCartSubmitted?: (cart: SubmitCartResult) => void;
+  onCartSubmitted?: (submitCartResult?: SubmitCartResult, errors?: GraphQLError[]) => void;
   onIFrameError?: (error: FrameError) => void;
   onFieldChanged?: (
     name: FrameField,
@@ -396,7 +400,7 @@ export class RyePay {
         async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
           this.log(`payment method token: ${token}`);
           const result = await this.submitCart(token, paymentDetails);
-          onCartSubmitted?.(result);
+          onCartSubmitted?.(result.submitCart, result.errors);
         }
       );
 
@@ -579,7 +583,10 @@ export class RyePay {
       }),
     });
     const content = await rawResponse.json();
-    const result: SubmitCartResult = content?.data?.submitCart;
+    const result = {
+      submitCart: content?.data?.submitCart as SubmitCartResult,
+      errors: content.errors as GraphQLError[],
+    };
     return result;
   }
 
