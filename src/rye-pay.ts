@@ -14,6 +14,7 @@ interface Spreedly {
   transferFocus: (field: FrameField) => void;
   toggleAutoComplete: () => void;
   setNumberFormat: (format: NumberFormat) => void;
+  removeHandlers: () => void;
 }
 
 // Params for Spreedly init method
@@ -262,7 +263,7 @@ const cartSubmitResponse = `
 cart {
   id,
   stores {
-    status, 
+    status,
     requestId
     store {
       ... on AmazonStore {
@@ -288,7 +289,7 @@ cart {
       code
       message
     }
-  }  
+  }
 }
 errors {
   code
@@ -316,23 +317,22 @@ export class RyePay {
    */
   public initialized = false;
 
+  private initParams: InitParams | undefined;
+
   /**
    * Initializes RyePay. This method should be called before calling any other methods of RyePay.
    */
-  init({
-    apiKey,
-    generateJWT,
-    numberEl,
-    cvvEl,
-    onReady,
-    onErrors,
-    onFieldChanged,
-    onIFrameError,
-    onValidate,
-    onCartSubmitted,
-    enableLogging = false,
-    environment = 'prod',
-  }: InitParams) {
+  init(params: InitParams) {
+    this.initParams = params;
+    const {
+      apiKey,
+      generateJWT,
+      numberEl,
+      cvvEl,
+      onErrors,
+      enableLogging = false,
+      environment = 'prod',
+    } = params;
     if (this.initializing) {
       return;
     }
@@ -387,22 +387,7 @@ export class RyePay {
       const envToken = await this.getEnvToken();
       this.log(`envToken: ${envToken}`);
 
-      // Subscribe to optional events only if developers wants to handle them
-      onReady && this.spreedly.on('ready', () => onReady(this.spreedly));
-      onFieldChanged && this.spreedly.on('fieldEvent', onFieldChanged);
-      onValidate && this.spreedly.on('validation', onValidate);
-      onIFrameError && this.spreedly.on('consoleError', onIFrameError);
-      onErrors && this.spreedly.on('errors', onErrors);
-
-      // Triggers after tokenizeCreditCard was called
-      this.spreedly.on(
-        'paymentMethod',
-        async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
-          this.log(`payment method token: ${token}`);
-          const result = await this.submitCart(token, paymentDetails);
-          onCartSubmitted?.(result.submitCart, result.errors);
-        }
-      );
+      this.subscribeToEvents(params);
 
       this.spreedly.init(envToken, {
         numberEl,
@@ -418,6 +403,33 @@ export class RyePay {
     script.src = this.spreedlyScriptUrl;
 
     this.log('RyePay initialized');
+  }
+
+  private subscribeToEvents({
+    onReady,
+    onFieldChanged,
+    onValidate,
+    onIFrameError,
+    onErrors,
+    onCartSubmitted,
+  }: InitParams) {
+    this.spreedly.removeHandlers();
+    // Subscribe to optional events only if developers wants to handle them
+    onReady && this.spreedly.on('ready', () => onReady(this.spreedly));
+    onFieldChanged && this.spreedly.on('fieldEvent', onFieldChanged);
+    onValidate && this.spreedly.on('validation', onValidate);
+    onIFrameError && this.spreedly.on('consoleError', onIFrameError);
+    onErrors && this.spreedly.on('errors', onErrors);
+
+    // Triggers after tokenizeCreditCard was called
+    this.spreedly.on(
+      'paymentMethod',
+      async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
+        this.log(`payment method token: ${token}`);
+        const result = await this.submitCart(token, paymentDetails);
+        onCartSubmitted?.(result.submitCart, result.errors);
+      }
+    );
   }
 
   /**
@@ -446,6 +458,9 @@ export class RyePay {
    */
   reload() {
     this.spreedly.reload();
+    if (this.initParams) {
+      this.subscribeToEvents(this.initParams);
+    }
   }
 
   /**
