@@ -113,7 +113,7 @@ interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
   shopperIp?: string;
-  // promoCodes: PromoCode[]; TODO: uncomment once promo codes are supported by backend
+  promoCodes?: StorePromoCodes[];
 }
 
 // Additional fields that can be submitted together with credit card details
@@ -122,13 +122,13 @@ interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
     cartId: string;
     selectedShippingOptions?: string;
     shopperIp?: string;
-    // promoCodes?: string; TODO: uncomment once promo codes are supported by backend
+    promoCodes?: string;
   };
 }
 
-interface PromoCode {
+interface StorePromoCodes {
   store: string;
-  code: string;
+  promoCodes: string[];
 }
 
 interface CartApiSubmitInput {
@@ -136,7 +136,7 @@ interface CartApiSubmitInput {
   token: string;
   billingAddress: BillingAddress;
   selectedShippingOptions?: SelectedShippingOption[];
-  // promoCodes?: PromoCode[]; TODO: uncomment once promo codes are supported by backend
+  promoCodes?: StorePromoCodes[];
 }
 
 export interface SelectedShippingOption {
@@ -447,7 +447,7 @@ export class RyePay {
         cartId: paymentDetails.cartId,
         selectedShippingOptions: JSON.stringify(paymentDetails.selectedShippingOptions ?? []),
         shopperIp: paymentDetails.shopperIp,
-        // promoCodes: JSON.stringify(paymentDetails.promoCodes), TODO: uncomment once promo codes are supported by backend
+        promoCodes: JSON.stringify(paymentDetails.promoCodes),
       },
     });
   }
@@ -573,9 +573,9 @@ export class RyePay {
       selectedShippingOptions: paymentDetails.metadata.selectedShippingOptions
         ? JSON.parse(paymentDetails.metadata.selectedShippingOptions)
         : [],
-      // promoCodes: paymentDetails.metadata.promoCodes
-      //   ? JSON.parse(paymentDetails.metadata.promoCodes)
-      //   : undefined, TODO: uncomment once promo codes are supported by backend
+      promoCodes: paymentDetails.metadata.promoCodes
+        ? JSON.parse(paymentDetails.metadata.promoCodes)
+        : undefined,
     };
 
     const headers: RequestInit['headers'] = {
