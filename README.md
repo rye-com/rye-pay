@@ -159,9 +159,10 @@ As soon as the user filled the payment form and the cart is ready to be submitte
 > }
 > ```
 
-> `promoCodes: StorePromoCodes[]`
+> `experimentalPromoCodes: StorePromoCodes[]`
 >
-> an array of objects that represent promo codes applied for a store
+> an array of objects that represent promo codes applied for a store.
+> This field is experimental and might be changed or removed in the future.
 >
 > ```ts
 > export interface StorePromoCodes {

@@ -113,7 +113,7 @@ interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
   shopperIp?: string;
-  promoCodes?: StorePromoCodes[];
+  experimentalPromoCodes?: StorePromoCodes[];
 }
 
 // Additional fields that can be submitted together with credit card details
@@ -122,7 +122,7 @@ interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
     cartId: string;
     selectedShippingOptions?: string;
     shopperIp?: string;
-    promoCodes?: string;
+    experimentalPromoCodes?: string;
   };
 }
 
@@ -136,7 +136,7 @@ interface CartApiSubmitInput {
   token: string;
   billingAddress: BillingAddress;
   selectedShippingOptions?: SelectedShippingOption[];
-  promoCodes?: StorePromoCodes[];
+  experimentalPromoCodes?: StorePromoCodes[];
 }
 
 export interface SelectedShippingOption {
@@ -256,7 +256,7 @@ const prodCartApiEndpoint =
   process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
-const localCartApiEndpoint = 'http://localhost:3000/graphql';
+const localCartApiEndpoint = 'http://localhost:3000/v1/query';
 const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 const cartSubmitResponse = `
@@ -447,7 +447,7 @@ export class RyePay {
         cartId: paymentDetails.cartId,
         selectedShippingOptions: JSON.stringify(paymentDetails.selectedShippingOptions ?? []),
         shopperIp: paymentDetails.shopperIp,
-        promoCodes: JSON.stringify(paymentDetails.promoCodes),
+        experimentalPromoCodes: JSON.stringify(paymentDetails.experimentalPromoCodes),
       },
     });
   }
@@ -573,8 +573,8 @@ export class RyePay {
       selectedShippingOptions: paymentDetails.metadata.selectedShippingOptions
         ? JSON.parse(paymentDetails.metadata.selectedShippingOptions)
         : [],
-      promoCodes: paymentDetails.metadata.promoCodes
-        ? JSON.parse(paymentDetails.metadata.promoCodes)
+      experimentalPromoCodes: paymentDetails.metadata.experimentalPromoCodes
+        ? JSON.parse(paymentDetails.metadata.experimentalPromoCodes)
         : undefined,
     };
 
