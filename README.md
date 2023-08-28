@@ -159,6 +159,18 @@ As soon as the user filled the payment form and the cart is ready to be submitte
 > }
 > ```
 
+> `experimentalPromoCodes: StorePromoCodes[]`
+>
+> an array of objects that represent promo codes applied for a store.
+> This field is experimental and might be changed or removed in the future.
+>
+> ```ts
+> export interface StorePromoCodes {
+>   store: string;
+>   promoCodes: string[];
+> }
+> ```
+
 ### Handle submission result
 
 `onCartSubmitted` callback takes an argument of `SubmitCartResult` type that provides detail information about the cart submission status.

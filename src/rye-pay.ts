@@ -113,7 +113,7 @@ interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
   shopperIp?: string;
-  // promoCodes: PromoCode[]; TODO: uncomment once promo codes are supported by backend
+  experimentalPromoCodes?: StorePromoCodes[];
 }
 
 // Additional fields that can be submitted together with credit card details
@@ -122,13 +122,13 @@ interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
     cartId: string;
     selectedShippingOptions?: string;
     shopperIp?: string;
-    // promoCodes?: string; TODO: uncomment once promo codes are supported by backend
+    experimentalPromoCodes?: string;
   };
 }
 
-interface PromoCode {
+interface StorePromoCodes {
   store: string;
-  code: string;
+  promoCodes: string[];
 }
 
 interface CartApiSubmitInput {
@@ -136,7 +136,7 @@ interface CartApiSubmitInput {
   token: string;
   billingAddress: BillingAddress;
   selectedShippingOptions?: SelectedShippingOption[];
-  // promoCodes?: PromoCode[]; TODO: uncomment once promo codes are supported by backend
+  experimentalPromoCodes?: StorePromoCodes[];
 }
 
 export interface SelectedShippingOption {
@@ -256,7 +256,7 @@ const prodCartApiEndpoint =
   process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
-const localCartApiEndpoint = 'http://localhost:3000/graphql';
+const localCartApiEndpoint = 'http://localhost:3000/v1/query';
 const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 const cartSubmitResponse = `
@@ -447,7 +447,7 @@ export class RyePay {
         cartId: paymentDetails.cartId,
         selectedShippingOptions: JSON.stringify(paymentDetails.selectedShippingOptions ?? []),
         shopperIp: paymentDetails.shopperIp,
-        // promoCodes: JSON.stringify(paymentDetails.promoCodes), TODO: uncomment once promo codes are supported by backend
+        experimentalPromoCodes: JSON.stringify(paymentDetails.experimentalPromoCodes),
       },
     });
   }
@@ -573,9 +573,9 @@ export class RyePay {
       selectedShippingOptions: paymentDetails.metadata.selectedShippingOptions
         ? JSON.parse(paymentDetails.metadata.selectedShippingOptions)
         : [],
-      // promoCodes: paymentDetails.metadata.promoCodes
-      //   ? JSON.parse(paymentDetails.metadata.promoCodes)
-      //   : undefined, TODO: uncomment once promo codes are supported by backend
+      experimentalPromoCodes: paymentDetails.metadata.experimentalPromoCodes
+        ? JSON.parse(paymentDetails.metadata.experimentalPromoCodes)
+        : undefined,
     };
 
     const headers: RequestInit['headers'] = {
