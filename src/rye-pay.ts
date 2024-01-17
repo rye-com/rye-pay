@@ -327,23 +327,23 @@ export class RyePay {
       apiVersion: 2,
       apiVersionMinor: 0,
       allowedPaymentMethods: [
-          {
-              type: 'CARD',
-              parameters: {
-                  allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
-                  allowedCardNetworks: ['AMEX', 'DISCOVER', 'JCB', 'MASTERCARD', 'VISA'],
-              },
-              tokenizationSpecification: {
-                  type: 'PAYMENT_GATEWAY',
-                  parameters: {
-                      gateway: 'spreedly',
-                      gatewayMerchantId: spreedlyEnvironmentKey,
-                  },
-              },
+        {
+          type: 'CARD',
+          parameters: {
+            allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+            allowedCardNetworks: ['AMEX', 'DISCOVER', 'JCB', 'MASTERCARD', 'VISA'],
           },
-      ]
-    }
-  };
+          tokenizationSpecification: {
+            type: 'PAYMENT_GATEWAY',
+            parameters: {
+              gateway: 'spreedly',
+              gatewayMerchantId: spreedlyEnvironmentKey,
+            },
+          },
+        },
+      ],
+    };
+  }
 
   /**
    * Indicates whether the RyePay has been initialized.
@@ -458,9 +458,13 @@ export class RyePay {
   }
 
   private initializeGooglePay(onCartSubmitted: InitParams['onCartSubmitted']) {
-    const paymentsClient = new google.payments.api.PaymentsClient({ environment: 'TEST', paymentDataCallbacks: {
-      onPaymentDataChanged: this.onPaymentDataChanged as google.payments.api.PaymentDataChangedHandler,
-    } });
+    const paymentsClient = new google.payments.api.PaymentsClient({
+      environment: 'TEST',
+      paymentDataCallbacks: {
+        onPaymentDataChanged: this
+          .onPaymentDataChanged as google.payments.api.PaymentDataChangedHandler,
+      },
+    });
     const button = paymentsClient.createButton({
       onClick: () => this.onGooglePayClicked(paymentsClient, onCartSubmitted),
     });
@@ -480,26 +484,26 @@ export class RyePay {
       Authorization: await this.getAuthHeader(),
     };
 
-    headers[ryeShopperIpHeaderKey] =  '10.10.101.215';
+    headers[ryeShopperIpHeaderKey] = '10.10.101.215';
 
     let buyerIdentity: any = {
-      "provinceCode": shippingAddress?.administrativeArea ?? '',
-      "countryCode": shippingAddress?.countryCode ?? '',
-      "postalCode": shippingAddress?.postalCode ?? '',
-    }
+      provinceCode: shippingAddress?.administrativeArea ?? '',
+      countryCode: shippingAddress?.countryCode ?? '',
+      postalCode: shippingAddress?.postalCode ?? '',
+    };
 
     if (shippingAddress.name) {
       buyerIdentity = {
-        "firstName": shippingAddress?.name?.split(' ')[0] ?? '',
-        "lastName": shippingAddress?.name?.split(' ')[1] ?? '',
-        "phone": shippingAddress?.phoneNumber,
-        "address1": shippingAddress?.address1 ?? '',
-        "address2": shippingAddress?.address2 ?? '',
-        "city": shippingAddress?.locality ?? '',
-        "provinceCode": shippingAddress?.administrativeArea ?? '',
-        "countryCode": shippingAddress?.countryCode ?? '',
-        "postalCode": shippingAddress?.postalCode ?? '',
-      }
+        firstName: shippingAddress?.name?.split(' ')[0] ?? '',
+        lastName: shippingAddress?.name?.split(' ')[1] ?? '',
+        phone: shippingAddress?.phoneNumber,
+        address1: shippingAddress?.address1 ?? '',
+        address2: shippingAddress?.address2 ?? '',
+        city: shippingAddress?.locality ?? '',
+        provinceCode: shippingAddress?.administrativeArea ?? '',
+        countryCode: shippingAddress?.countryCode ?? '',
+        postalCode: shippingAddress?.postalCode ?? '',
+      };
     }
 
     const rawResponse = await fetch(this.cartApiEndpoint, {
@@ -508,47 +512,62 @@ export class RyePay {
       body: JSON.stringify({
         query: this.updateBuyerIdentityMutation,
         variables: {
-          "input": {
-              "id": this.cartId,
-              "buyerIdentity": buyerIdentity
-            } 
+          input: {
+            id: this.cartId,
+            buyerIdentity: buyerIdentity,
           },
-        }),
-      }
-    );
+        },
+      }),
+    });
 
     return await rawResponse.json();
   }
 
   private async getShippingOptions(shippingAddress: google.payments.api.Address) {
     const content = await this.updateBuyerIdentity(shippingAddress);
-    const shippingOptions = content.data.updateCartBuyerIdentity.cart.stores[0].offer.shippingMethods.map((shippingMethod: any) => ({
-        id: shippingMethod.id,
-        label: shippingMethod.label,
-        description: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
-        finalValue: Number(shippingMethod.total.value) / 100,
-        currency: shippingMethod.total.currency ?? 'USD',
-      }));
+    const shippingOptions =
+      content.data.updateCartBuyerIdentity.cart.stores[0].offer.shippingMethods.map(
+        (shippingMethod: any) => ({
+          id: shippingMethod.id,
+          label: shippingMethod.label,
+          description: `${shippingMethod.price.displayValue} ${
+            shippingMethod.price.currency ?? 'USD'
+          }`,
+          finalValue: Number(shippingMethod.total.value) / 100,
+          currency: shippingMethod.total.currency ?? 'USD',
+        })
+      );
     return shippingOptions;
   }
 
-  private onPaymentDataChanged = async (intermediatePaymentData: google.payments.api.IntermediatePaymentData) => {
+  private onPaymentDataChanged = async (
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+  ) => {
     if (intermediatePaymentData.callbackTrigger === 'SHIPPING_OPTION') {
       // Calculate new total price based on selected shipping option
-      this.googlePayFinalPrice = this.googlePayShippingOptions.find((option: any) => option.id === intermediatePaymentData.shippingOptionData?.id)?.finalValue ?? 0;
+      this.googlePayFinalPrice =
+        this.googlePayShippingOptions.find(
+          (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id
+        )?.finalValue ?? 0;
 
       return {
         newTransactionInfo: {
           totalPriceStatus: 'FINAL',
           totalPrice: String(this.googlePayFinalPrice),
           currencyCode: this.googlePayFinalCurrency ?? 'USD',
-        }
-      }
-    } 
-    
-    if ((intermediatePaymentData.callbackTrigger === 'INITIALIZE' || intermediatePaymentData.callbackTrigger === 'SHIPPING_ADDRESS') && intermediatePaymentData.shippingAddress) {
+        },
+      };
+    }
+
+    if (
+      (intermediatePaymentData.callbackTrigger === 'INITIALIZE' ||
+        intermediatePaymentData.callbackTrigger === 'SHIPPING_ADDRESS') &&
+      intermediatePaymentData.shippingAddress
+    ) {
       // Update shipping options based on the selected address
-      const updatedShippingOptions = await this.getShippingOptions(intermediatePaymentData.shippingAddress);
+      const updatedShippingOptions = await this.getShippingOptions(
+        intermediatePaymentData.shippingAddress
+      );
       const defaultShipping = updatedShippingOptions[0];
       this.googlePayShippingOptions = updatedShippingOptions;
       this.googlePayFinalPrice = defaultShipping.finalValue;
@@ -572,10 +591,10 @@ export class RyePay {
     }
 
     return {};
-  }
+  };
 
   private onGooglePayClicked(
-    paymentsClient: google.payments.api.PaymentsClient, 
+    paymentsClient: google.payments.api.PaymentsClient,
     onCartSubmitted: InitParams['onCartSubmitted']
   ) {
     // Define your Google Pay payment configuration here
@@ -592,53 +611,57 @@ export class RyePay {
       },
       shippingOptionRequired: true,
       merchantInfo: {
-          // Merchant information like merchant ID
+        // Merchant information like merchant ID
       },
       callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION'],
     };
 
-    paymentsClient.loadPaymentData(paymentDataRequest)
-    .then(async (paymentData) => {
-      // Extract payment token from paymentData
-      const paymentToken = paymentData.paymentMethodData.tokenizationData.token;
-      const shippingAddress = paymentData.shippingAddress;
-      const updateBuyerIdentity = await this.updateBuyerIdentity(shippingAddress!);
-      const selectedShippingOptionId = paymentData.shippingOptionData?.id;
+    paymentsClient
+      .loadPaymentData(paymentDataRequest)
+      .then(async (paymentData) => {
+        // Extract payment token from paymentData
+        const paymentToken = paymentData.paymentMethodData.tokenizationData.token;
+        const shippingAddress = paymentData.shippingAddress;
+        const updateBuyerIdentity = await this.updateBuyerIdentity(shippingAddress!);
+        const selectedShippingOptionId = paymentData.shippingOptionData?.id;
 
-      const selectedShippingOptions = updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
-        const option = store.offer.shippingMethods.find((shippingMethod: any) => shippingMethod.id === selectedShippingOptionId);
-        return {
-          store: store.store,
-          shippingId: option.id,
-        }
+        const selectedShippingOptions =
+          updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
+            const option = store.offer.shippingMethods.find(
+              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+            );
+            return {
+              store: store.store,
+              shippingId: option.id,
+            };
+          });
+
+        const paymentDetails: SpreedlyAdditionalFields = {
+          first_name: shippingAddress?.name?.split(' ')[0] ?? '',
+          last_name: shippingAddress?.name?.split(' ')[1] ?? '',
+          phone_number: shippingAddress?.phoneNumber,
+          month: '',
+          year: '',
+          address1: shippingAddress?.address1 ?? '',
+          address2: shippingAddress?.address2 ?? '',
+          city: shippingAddress?.locality ?? '',
+          state: shippingAddress?.administrativeArea ?? '',
+          zip: shippingAddress?.postalCode ?? '',
+          country: shippingAddress?.countryCode ?? '',
+          metadata: {
+            cartId: this.cartId,
+            selectedShippingOptions: JSON.stringify(selectedShippingOptions),
+            shopperIp: this.shopperIp,
+          },
+        };
+
+        const result = await this.submitCart(paymentToken, paymentDetails);
+        onCartSubmitted?.(result.submitCart, result.errors);
+      })
+      .catch((error) => {
+        // Handle any errors that occur during the payment process
+        this.log('Payment failed: ', error);
       });
-
-      const paymentDetails: SpreedlyAdditionalFields = {
-        first_name: shippingAddress?.name?.split(' ')[0] ?? '',
-        last_name: shippingAddress?.name?.split(' ')[1] ?? '',
-        phone_number: shippingAddress?.phoneNumber,
-        month: '',
-        year: '',
-        address1: shippingAddress?.address1 ?? '',
-        address2: shippingAddress?.address2 ?? '',
-        city: shippingAddress?.locality ?? '',
-        state: shippingAddress?.administrativeArea ?? '',
-        zip: shippingAddress?.postalCode ?? '',
-        country: shippingAddress?.countryCode ?? '',
-        metadata: {
-          cartId: this.cartId,
-          selectedShippingOptions: JSON.stringify(selectedShippingOptions),
-          shopperIp: this.shopperIp,
-        },
-      };
-
-      const result = await this.submitCart(paymentToken, paymentDetails);
-      onCartSubmitted?.(result.submitCart, result.errors);
-    })
-    .catch((error) => {
-      // Handle any errors that occur during the payment process
-      this.log('Payment failed: ', error);
-    });
   }
 
   private subscribeToEvents({
