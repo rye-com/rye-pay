@@ -93,6 +93,8 @@ interface InitParams extends SpreedlyInitParams {
   onValidate?: (inputProperties: InputProperties) => void;
   enableLogging?: boolean;
   environment?: Environment;
+  cartId?: string;
+  shopperIp?: string;
 }
 
 interface SubmitAdditionalFields {
@@ -300,7 +302,9 @@ errors {
 export class RyePay {
   private initializing = false;
   private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
+  private readonly googlePayScriptUrl = 'https://pay.google.com/gp/p/js/pay.js';
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
+  private readonly updateBuyerIdentityMutation = `mutation ($input: CartBuyerIdentityUpdateInput!) { updateCartBuyerIdentity(input: $input) { cart { id stores { ... on AmazonStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } } }`;
   private readonly envTokenQuery = `query {
     environmentToken {
        token
@@ -311,6 +315,35 @@ export class RyePay {
   private apiKey?: string;
   private generateJWT?: () => Promise<string>;
   private enableLogging: boolean = false;
+  private googlePayConfig: any;
+  private googlePayFinalPrice: number = 0;
+  private googlePayFinalCurrency: string = 'USD';
+  private googlePayShippingOptions: any[] = [];
+  private cartId = '';
+  private shopperIp = '';
+
+  private getGooglePayConfig(spreedlyEnvironmentKey: string) {
+    return {
+      apiVersion: 2,
+      apiVersionMinor: 0,
+      allowedPaymentMethods: [
+        {
+          type: 'CARD',
+          parameters: {
+            allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+            allowedCardNetworks: ['AMEX', 'DISCOVER', 'JCB', 'MASTERCARD', 'VISA'],
+          },
+          tokenizationSpecification: {
+            type: 'PAYMENT_GATEWAY',
+            parameters: {
+              gateway: 'spreedly',
+              gatewayMerchantId: spreedlyEnvironmentKey,
+            },
+          },
+        },
+      ],
+    };
+  }
 
   /**
    * Indicates whether the RyePay has been initialized.
@@ -341,6 +374,8 @@ export class RyePay {
       return;
     }
     this.initializing = true;
+    this.cartId = params.cartId ?? '';
+    this.shopperIp = params.shopperIp ?? '';
 
     if (!apiKey && !generateJWT) {
       const errorMsg = 'Either apiKey or generateJWT must be provided';
@@ -386,6 +421,7 @@ export class RyePay {
       this.spreedly = (globalThis as any).Spreedly;
       const envToken = await this.getEnvToken();
       this.log(`envToken: ${envToken}`);
+      this.googlePayConfig = this.getGooglePayConfig(envToken);
 
       this.subscribeToEvents(params);
 
@@ -403,6 +439,229 @@ export class RyePay {
     script.src = this.spreedlyScriptUrl;
 
     this.log('RyePay initialized');
+
+    // Initialize GooglePay if the button is present
+    if (document.getElementById('rye-google-pay')) {
+      this.loadAndInitializeGooglePay(params.onCartSubmitted);
+    }
+  }
+
+  private loadAndInitializeGooglePay(onCartSubmitted: InitParams['onCartSubmitted']) {
+    const googlePayScript = document.createElement('script');
+    googlePayScript.src = this.googlePayScriptUrl;
+    googlePayScript.async = true;
+    document.head.appendChild(googlePayScript);
+
+    googlePayScript.onload = () => {
+      this.initializeGooglePay(onCartSubmitted);
+    };
+  }
+
+  private initializeGooglePay(onCartSubmitted: InitParams['onCartSubmitted']) {
+    const paymentsClient = new google.payments.api.PaymentsClient({
+      environment: 'TEST',
+      paymentDataCallbacks: {
+        onPaymentDataChanged: this
+          .onPaymentDataChanged as google.payments.api.PaymentDataChangedHandler,
+      },
+    });
+    const button = paymentsClient.createButton({
+      onClick: () => this.onGooglePayClicked(paymentsClient, onCartSubmitted),
+    });
+
+    const buttonContainer = document.getElementById('rye-google-pay');
+
+    if (buttonContainer) {
+      buttonContainer.appendChild(button);
+    } else {
+      this.log('Google Pay button container not found');
+    }
+  }
+
+  private async updateBuyerIdentity(shippingAddress: google.payments.api.Address) {
+    const headers: RequestInit['headers'] = {
+      'Content-Type': 'application/json',
+      Authorization: await this.getAuthHeader(),
+    };
+
+    headers[ryeShopperIpHeaderKey] = '10.10.101.215';
+
+    let buyerIdentity: any = {
+      provinceCode: shippingAddress?.administrativeArea ?? '',
+      countryCode: shippingAddress?.countryCode ?? '',
+      postalCode: shippingAddress?.postalCode ?? '',
+    };
+
+    if (shippingAddress.name) {
+      buyerIdentity = {
+        firstName: shippingAddress?.name?.split(' ')[0] ?? '',
+        lastName: shippingAddress?.name?.split(' ')[1] ?? '',
+        phone: shippingAddress?.phoneNumber,
+        address1: shippingAddress?.address1 ?? '',
+        address2: shippingAddress?.address2 ?? '',
+        city: shippingAddress?.locality ?? '',
+        provinceCode: shippingAddress?.administrativeArea ?? '',
+        countryCode: shippingAddress?.countryCode ?? '',
+        postalCode: shippingAddress?.postalCode ?? '',
+      };
+    }
+
+    const rawResponse = await fetch(this.cartApiEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: this.updateBuyerIdentityMutation,
+        variables: {
+          input: {
+            id: this.cartId,
+            buyerIdentity: buyerIdentity,
+          },
+        },
+      }),
+    });
+
+    return await rawResponse.json();
+  }
+
+  private async getShippingOptions(shippingAddress: google.payments.api.Address) {
+    const content = await this.updateBuyerIdentity(shippingAddress);
+    const shippingOptions =
+      content.data.updateCartBuyerIdentity.cart.stores[0].offer.shippingMethods.map(
+        (shippingMethod: any) => ({
+          id: shippingMethod.id,
+          label: shippingMethod.label,
+          description: `${shippingMethod.price.displayValue} ${
+            shippingMethod.price.currency ?? 'USD'
+          }`,
+          finalValue: Number(shippingMethod.total.value) / 100,
+          currency: shippingMethod.total.currency ?? 'USD',
+        })
+      );
+    return shippingOptions;
+  }
+
+  private onPaymentDataChanged = async (
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+  ) => {
+    if (intermediatePaymentData.callbackTrigger === 'SHIPPING_OPTION') {
+      // Calculate new total price based on selected shipping option
+      this.googlePayFinalPrice =
+        this.googlePayShippingOptions.find(
+          (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id
+        )?.finalValue ?? 0;
+
+      return {
+        newTransactionInfo: {
+          totalPriceStatus: 'FINAL',
+          totalPrice: String(this.googlePayFinalPrice),
+          currencyCode: this.googlePayFinalCurrency ?? 'USD',
+        },
+      };
+    }
+
+    if (
+      (intermediatePaymentData.callbackTrigger === 'INITIALIZE' ||
+        intermediatePaymentData.callbackTrigger === 'SHIPPING_ADDRESS') &&
+      intermediatePaymentData.shippingAddress
+    ) {
+      // Update shipping options based on the selected address
+      const updatedShippingOptions = await this.getShippingOptions(
+        intermediatePaymentData.shippingAddress
+      );
+      const defaultShipping = updatedShippingOptions[0];
+      this.googlePayShippingOptions = updatedShippingOptions;
+      this.googlePayFinalPrice = defaultShipping.finalValue;
+      this.googlePayFinalCurrency = defaultShipping.currency ?? 'USD';
+
+      return {
+        newShippingOptionParameters: {
+          defaultSelectedOptionId: defaultShipping.id ?? '',
+          shippingOptions: updatedShippingOptions.map((option: any) => ({
+            id: option.id,
+            label: option.label,
+            description: option.description,
+          })),
+        },
+        newTransactionInfo: {
+          totalPriceStatus: 'FINAL',
+          totalPrice: String(this.googlePayFinalPrice),
+          currencyCode: 'USD',
+        },
+      };
+    }
+
+    return {};
+  };
+
+  private onGooglePayClicked(
+    paymentsClient: google.payments.api.PaymentsClient,
+    onCartSubmitted: InitParams['onCartSubmitted']
+  ) {
+    // Define your Google Pay payment configuration here
+    const paymentDataRequest = {
+      ...this.googlePayConfig,
+      transactionInfo: {
+        totalPriceStatus: 'FINAL',
+        totalPrice: '10.00',
+        currencyCode: 'USD',
+      },
+      shippingAddressRequired: true,
+      shippingAddressParameters: {
+        phoneNumberRequired: true, // If you need the user's phone number
+      },
+      shippingOptionRequired: true,
+      merchantInfo: {
+        // Merchant information like merchant ID
+      },
+      callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION'],
+    };
+
+    paymentsClient
+      .loadPaymentData(paymentDataRequest)
+      .then(async (paymentData) => {
+        // Extract payment token from paymentData
+        const paymentToken = paymentData.paymentMethodData.tokenizationData.token;
+        const shippingAddress = paymentData.shippingAddress;
+        const updateBuyerIdentity = await this.updateBuyerIdentity(shippingAddress!);
+        const selectedShippingOptionId = paymentData.shippingOptionData?.id;
+
+        const selectedShippingOptions =
+          updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
+            const option = store.offer.shippingMethods.find(
+              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+            );
+            return {
+              store: store.store,
+              shippingId: option.id,
+            };
+          });
+
+        const paymentDetails: SpreedlyAdditionalFields = {
+          first_name: shippingAddress?.name?.split(' ')[0] ?? '',
+          last_name: shippingAddress?.name?.split(' ')[1] ?? '',
+          phone_number: shippingAddress?.phoneNumber,
+          month: '',
+          year: '',
+          address1: shippingAddress?.address1 ?? '',
+          address2: shippingAddress?.address2 ?? '',
+          city: shippingAddress?.locality ?? '',
+          state: shippingAddress?.administrativeArea ?? '',
+          zip: shippingAddress?.postalCode ?? '',
+          country: shippingAddress?.countryCode ?? '',
+          metadata: {
+            cartId: this.cartId,
+            selectedShippingOptions: JSON.stringify(selectedShippingOptions),
+            shopperIp: this.shopperIp,
+          },
+        };
+
+        const result = await this.submitCart(paymentToken, paymentDetails);
+        onCartSubmitted?.(result.submitCart, result.errors);
+      })
+      .catch((error) => {
+        // Handle any errors that occur during the payment process
+        this.log('Payment failed: ', error);
+      });
   }
 
   private subscribeToEvents({
