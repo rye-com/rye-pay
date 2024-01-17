@@ -13,7 +13,8 @@
     "test": "echo \"There is no tests in this package\"",
     "check-format": "prettier --check \"**/*.ts\"",
     "format": "prettier --write \"**/*.ts\"",
-    "build": "tsc"
+    "build": "tsc && browserify ./src/index.ts -p [ tsify --noImplicitAny ] > ./public/bundle.js",
+    "watch": "watchify ./src/index.ts -p [ tsify --noImplicitAny ] -o ./public/bundle.js"
   },
   "author": "RYE",
   "license": "ISC",
@@ -21,9 +22,13 @@
     "@types/googlepay": "^0.7.5",
     "@types/node": "^18.14.4",
     "prettier": "^2.8.1",
-    "typescript": "4.9.4"
+    "typescript": "^4.9.4"
   },
   "files": [
     "dist/"
-  ]
+  ],
+  "dependencies": {
+    "browserify": "^17.0.0",
+    "tsify": "^5.0.4"
+  }
 }
