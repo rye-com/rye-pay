@@ -2,9 +2,14 @@
 # yarn lockfile v1
 
 
+"@types/googlepay@^0.7.5":
+  version "0.7.5"
+  resolved "https://registry.npmjs.org/@types/googlepay/-/googlepay-0.7.5.tgz"
+  integrity sha512-158egcRaqkMSpW6unyGV4uG4FpoCklRf3J5emCzOXSRVAohMfIuZ481JNvp4X6+KxoNjxWiGtMx5vb1YfQADPw==
+
 "@types/node@^18.14.4":
   version "18.14.4"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-18.14.4.tgz#0e64ec0b35a772e1e3d849f9a0ff61782d0cb647"
+  resolved "https://registry.npmjs.org/@types/node/-/node-18.14.4.tgz"
   integrity sha512-VhCw7I7qO2X49+jaKcAUwi3rR+hbxT5VcYF493+Z5kMLI0DL568b7JI4IDJaxWFH0D/xwmGJNoXisyX+w7GH/g==
 
 prettier@^2.8.1:
