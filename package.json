@@ -14,7 +14,7 @@
     "check-format": "prettier --check \"**/*.ts\"",
     "format": "prettier --write \"**/*.ts\"",
     "build": "tsc",
-    "bundle": "mkdir -p public && browserify ./src/index.ts -p [ tsify --noImplicitAny ] > ./public/rye-pay.js"
+    "bundle": "mkdir -p public && browserify ./src/index.ts -p [ tsify --noImplicitAny ] -s rye > ./public/rye-pay.js"
   },
   "author": "RYE",
   "license": "ISC",
