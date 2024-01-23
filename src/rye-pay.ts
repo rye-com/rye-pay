@@ -136,9 +136,27 @@ interface StorePromoCodes {
 interface CartApiSubmitInput {
   id: string;
   token: string;
+  applePayToken?: ApplePayToken;
   billingAddress: BillingAddress;
   selectedShippingOptions?: SelectedShippingOption[];
   experimentalPromoCodes?: StorePromoCodes[];
+}
+
+interface SubmitCartParams {
+  token?: string;
+  paymentDetails: SpreedlyAdditionalFields;
+  applePayToken?: ApplePayToken;
+}
+
+interface ApplePayToken {
+  version: string;
+  data: string;
+  signature: string;
+  header: {
+    ephemeralPublicKey: string;
+    publicKeyHash: string;
+    transactionId: string;
+  };
 }
 
 export interface SelectedShippingOption {
@@ -258,7 +276,7 @@ const prodCartApiEndpoint =
   process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
-const localCartApiEndpoint = 'http://localhost:3000/v1/query';
+const localCartApiEndpoint = 'https://2997c85f5fe1.ngrok.app/v1/query';
 const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 const cartSubmitResponse = `
@@ -576,14 +594,16 @@ export class RyePay {
     // Merchant Validation
     session.onvalidatemerchant = async (event) => {
       try {
-        const result = await fetch("https://d7ec-24-10-221-85.ngrok-free.app/", {
+        const result = await fetch("https://apple-pay-server-ggymj6kjkq-uc.a.run.app/", {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'mode': 'cors'
           },
           body: JSON.stringify({
-            url: event.validationURL
+            appleValidationUrl: event.validationURL,
+            merchantDisplayName: "Rye",
+            merchantDomain: "applepay.ngrok.app"
           })
         });
 
@@ -660,7 +680,7 @@ export class RyePay {
         };
         
         // Step 7: Submit the Cart
-        const result = await this.submitCart(JSON.stringify(paymentToken), paymentDetails);
+        const result = await this.submitCart({ applePayToken: paymentToken, paymentDetails });
         console.log(result);
         
         // Complete the payment session
@@ -887,7 +907,7 @@ export class RyePay {
           },
         };
 
-        const result = await this.submitCart(paymentToken, paymentDetails);
+        const result = await this.submitCart({token: paymentToken, paymentDetails});
         onCartSubmitted?.(result.submitCart, result.errors);
       })
       .catch((error) => {
@@ -917,7 +937,7 @@ export class RyePay {
       'paymentMethod',
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
         this.log(`payment method token: ${token}`);
-        const result = await this.submitCart(token, paymentDetails);
+        const result = await this.submitCart({token, paymentDetails});
         onCartSubmitted?.(result.submitCart, result.errors);
       }
     );
@@ -1046,9 +1066,11 @@ export class RyePay {
     return result.token;
   };
 
-  private async submitCart(token: string, paymentDetails: SpreedlyAdditionalFields) {
+
+  private async submitCart({token, paymentDetails, applePayToken} : SubmitCartParams) {
     const input: CartApiSubmitInput = {
-      token,
+      token: token ?? 'apple_pay_token',
+      applePayToken,
       id: paymentDetails.metadata.cartId,
       billingAddress: {
         firstName: paymentDetails.first_name,
