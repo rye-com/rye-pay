@@ -1,3 +1,6 @@
+import { ApplePay } from './applePay';
+import { AuthService } from './authService';
+
 // Original Spreedly interface (only used api covered)
 interface Spreedly {
   init: (envToken: string, params: SpreedlyInitParams) => void;
@@ -38,7 +41,7 @@ interface FrameError {
   col: number;
 }
 
-interface GraphQLError {
+export interface GraphQLError {
   message: string;
 }
 
@@ -75,7 +78,7 @@ type FrameEventType =
 type Environment = 'prod' | 'stage' | 'local';
 
 // RyePay params for init method
-interface InitParams extends SpreedlyInitParams {
+export interface InitParams extends SpreedlyInitParams {
   apiKey?: string;
   generateJWT?: () => Promise<string>;
   numberEl: string;
@@ -119,7 +122,7 @@ interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
 }
 
 // Additional fields that can be submitted together with credit card details
-interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
+export interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
   metadata: {
     cartId: string;
     selectedShippingOptions?: string;
@@ -133,7 +136,7 @@ interface StorePromoCodes {
   promoCodes: string[];
 }
 
-interface CartApiSubmitInput {
+export interface CartApiSubmitInput {
   id: string;
   token: string;
   applePayToken?: ApplePayToken;
@@ -142,7 +145,7 @@ interface CartApiSubmitInput {
   experimentalPromoCodes?: StorePromoCodes[];
 }
 
-interface SubmitCartParams {
+export interface SubmitCartParams {
   token?: string;
   paymentDetails: SpreedlyAdditionalFields;
   applePayToken?: ApplePayToken;
@@ -277,9 +280,9 @@ const prodCartApiEndpoint =
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
 const localCartApiEndpoint = 'https://2997c85f5fe1.ngrok.app/v1/query';
-const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
+export const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
-const cartSubmitResponse = `
+export const cartSubmitResponse = `
 cart {
   id,
   stores {
@@ -321,7 +324,8 @@ export class RyePay {
   private initializing = false;
   private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
   private readonly googlePayScriptUrl = 'https://pay.google.com/gp/p/js/pay.js';
-  private readonly applePayScriptUrl = 'https://applepay.cdn-apple.com/jsapi/v1.1.0/apple-pay-sdk.js';
+  private readonly applePayScriptUrl =
+    'https://applepay.cdn-apple.com/jsapi/v1.1.0/apple-pay-sdk.js';
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private readonly updateBuyerIdentityMutation = `mutation ($input: CartBuyerIdentityUpdateInput!) { updateCartBuyerIdentity(input: $input) { cart { id stores { ... on AmazonStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } } }`;
   private readonly envTokenQuery = `query {
@@ -331,13 +335,12 @@ export class RyePay {
   }`;
   private cartApiEndpoint = prodCartApiEndpoint;
   private spreedly!: Spreedly;
-  private apiKey?: string;
-  private generateJWT?: () => Promise<string>;
   private enableLogging: boolean = false;
   private googlePayConfig: any;
   private googlePayFinalPrice: number = 0;
   private googlePayFinalCurrency: string = 'USD';
   private googlePayShippingOptions: any[] = [];
+  private authService!: AuthService;
   private cartId = '';
   private shopperIp = '';
 
@@ -395,6 +398,7 @@ export class RyePay {
     this.initializing = true;
     this.cartId = params.cartId ?? '';
     this.shopperIp = params.shopperIp ?? '';
+    this.authService = AuthService.getInstance();
 
     if (!apiKey && !generateJWT) {
       const errorMsg = 'Either apiKey or generateJWT must be provided';
@@ -416,12 +420,18 @@ export class RyePay {
       throw new Error(errorMsg);
     }
 
+    // Set the API Key or JWT Generator in the AuthService
+    if (params.apiKey) {
+      this.authService.setApiKey(params.apiKey);
+    }
+    if (params.generateJWT) {
+      this.authService.setGenerateJWT(params.generateJWT);
+    }
+
     if (this.hasSpreedlyGlobal()) {
       return;
     }
 
-    this.apiKey = apiKey;
-    this.generateJWT = generateJWT;
     this.enableLogging = enableLogging;
     this.cartApiEndpoint = this.getCartApiEndpoint(environment);
 
@@ -466,7 +476,18 @@ export class RyePay {
 
     // Initialize GooglePay if the button is present
     if (document.getElementById('rye-apple-pay')) {
-      this.loadAndInitializeApplePay(params.onCartSubmitted);
+      const applePay = new ApplePay({
+        cartApiEndpoint: this.cartApiEndpoint,
+        cartId: this.cartId,
+        shopperIp: this.shopperIp,
+        updateBuyerIdentityMutation: this.updateBuyerIdentityMutation,
+        ryeShopperIpHeaderKey: ryeShopperIpHeaderKey,
+        submitCart: this.submitCart,
+        onCartSubmitted: params.onCartSubmitted,
+        log: this.log,
+      });
+
+      applePay.loadApplePay();
     }
   }
 
@@ -485,7 +506,7 @@ export class RyePay {
       var merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77';
       var promise = ApplePaySession.canMakePaymentsWithActiveCard(merchantIdentifier);
       promise.then((canMakePayments) => {
-         if (canMakePayments) {
+        if (canMakePayments) {
           // Display Apple Pay button here.
           const buttonContainer = document.getElementById('rye-apple-pay');
           const button = document.createElement('apple-pay-button');
@@ -498,7 +519,7 @@ export class RyePay {
           } else {
             console.log('Apple Pay button container not found');
           }
-         }
+        }
       });
     }
   }
@@ -506,7 +527,7 @@ export class RyePay {
   private async updateAppleBuyerIdentity(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
-      Authorization: await this.getAuthHeader(),
+      Authorization: await this.authService.getAuthHeader(),
     };
 
     headers[ryeShopperIpHeaderKey] = '10.10.101.215';
@@ -555,37 +576,34 @@ export class RyePay {
         (shippingMethod: any) => ({
           identifier: shippingMethod.id,
           label: shippingMethod.label,
-          detail: `${shippingMethod.price.displayValue} ${
-            shippingMethod.price.currency ?? 'USD'
-          }`,
+          detail: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
           amount: Number(shippingMethod.total.value) / 100,
         })
       );
     return shippingOptions;
   }
 
-
   private onApplePayClicked(onCartSubmitted: InitParams['onCartSubmitted']) {
     // Check for ApplePaySession availability
     if (typeof ApplePaySession === 'undefined') {
-        console.error('Apple Pay is not available on this device/browser.');
-        return;
+      console.error('Apple Pay is not available on this device/browser.');
+      return;
     }
 
     // Define the Apple Pay payment request
     const paymentRequest = {
-        // Example payment request data
-        countryCode: 'US',
-        currencyCode: 'USD',
-        supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
-        merchantCapabilities: ['supports3DS'],
-        total: {
-            label: 'Your Merchant Name',
-            amount: '10.00', // Example amount
-        },
-        requiredShippingContactFields: ["email", "name", "phone", "postalAddress"],
-        shippingMethods: []
-    };  
+      // Example payment request data
+      countryCode: 'US',
+      currencyCode: 'USD',
+      supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+      merchantCapabilities: ['supports3DS'],
+      total: {
+        label: 'Your Merchant Name',
+        amount: '10.00', // Example amount
+      },
+      requiredShippingContactFields: ['email', 'name', 'phone', 'postalAddress'],
+      shippingMethods: [],
+    };
 
     // Create an ApplePaySession
     const session = new ApplePaySession(3, paymentRequest as any);
@@ -594,17 +612,17 @@ export class RyePay {
     // Merchant Validation
     session.onvalidatemerchant = async (event) => {
       try {
-        const result = await fetch("https://apple-pay-server-ggymj6kjkq-uc.a.run.app/", {
+        const result = await fetch('https://apple-pay-server-ggymj6kjkq-uc.a.run.app/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'mode': 'cors'
+            mode: 'cors',
           },
           body: JSON.stringify({
             appleValidationUrl: event.validationURL,
-            merchantDisplayName: "Rye",
-            merchantDomain: "applepay.ngrok.app"
-          })
+            merchantDisplayName: 'Rye',
+            merchantDomain: 'applepay.ngrok.app',
+          }),
         });
 
         const merchantValidationResult = await result.json();
@@ -621,14 +639,19 @@ export class RyePay {
       shippingOptions = await this.getAppleShippingOptions(shippingAddress);
       const newTotal = {
         label: 'Your Merchant Name',
-        amount: '10.00', 
+        amount: '10.00',
       };
 
-      session.completeShippingContactSelection(ApplePaySession.STATUS_SUCCESS, shippingOptions, newTotal, []);
-    }
+      session.completeShippingContactSelection(
+        ApplePaySession.STATUS_SUCCESS,
+        shippingOptions,
+        newTotal,
+        []
+      );
+    };
 
     // On Select shipping method
-    session.onshippingmethodselected = function(event) {
+    session.onshippingmethodselected = function (event) {
       selectedShippingMethod = event.shippingMethod;
       const newTotal = {
         label: selectedShippingMethod.label,
@@ -636,57 +659,56 @@ export class RyePay {
       };
 
       session.completeShippingMethodSelection(ApplePaySession.STATUS_SUCCESS, newTotal, []);
-    }
+    };
 
     // Step 6: Complete Payment
     session.onpaymentauthorized = async (event) => {
-        const shippingAddress = event.payment.shippingContact;
-        const updateBuyerIdentity = await this.updateAppleBuyerIdentity(shippingAddress!);
-        console.log(shippingAddress);
+      const shippingAddress = event.payment.shippingContact;
+      const updateBuyerIdentity = await this.updateAppleBuyerIdentity(shippingAddress!);
+      console.log(shippingAddress);
 
+      const selectedShippingOptionId = selectedShippingMethod.identifier;
+      console.log(selectedShippingOptionId);
 
-        const selectedShippingOptionId = selectedShippingMethod.identifier;
-        console.log(selectedShippingOptionId);
+      const selectedShippingOptions =
+        updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
+          const option = store.offer.shippingMethods.find(
+            (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+          );
+          return {
+            store: store.store,
+            shippingId: option.id,
+          };
+        });
 
-        const selectedShippingOptions =
-          updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
-            const option = store.offer.shippingMethods.find(
-              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
-            );
-            return {
-              store: store.store,
-              shippingId: option.id,
-            };
-          });
+      const paymentToken = event.payment.token.paymentData;
+      const paymentDetails: SpreedlyAdditionalFields = {
+        first_name: shippingAddress?.givenName ?? '',
+        last_name: shippingAddress?.familyName ?? '',
+        phone_number: shippingAddress?.phoneNumber ?? '',
+        month: '',
+        year: '',
+        address1: shippingAddress?.addressLines?.at(0) ?? '',
+        address2: shippingAddress?.addressLines?.at(1) ?? '',
+        city: shippingAddress?.locality ?? '',
+        state: shippingAddress?.administrativeArea ?? '',
+        zip: shippingAddress?.postalCode ?? '',
+        country: shippingAddress?.countryCode ?? '',
+        metadata: {
+          cartId: this.cartId,
+          selectedShippingOptions: JSON.stringify(selectedShippingOptions),
+          shopperIp: this.shopperIp,
+        },
+      };
 
-        const paymentToken = event.payment.token.paymentData;
-        const paymentDetails: SpreedlyAdditionalFields = {
-          first_name: shippingAddress?.givenName ?? '',
-          last_name: shippingAddress?.familyName ?? '',
-          phone_number: shippingAddress?.phoneNumber ?? '',
-          month: '',
-          year: '',
-          address1: shippingAddress?.addressLines?.at(0) ?? '',
-          address2: shippingAddress?.addressLines?.at(1) ?? '',
-          city: shippingAddress?.locality ?? '',
-          state: shippingAddress?.administrativeArea ?? '',
-          zip: shippingAddress?.postalCode ?? '',
-          country: shippingAddress?.countryCode ?? '',
-          metadata: {
-            cartId: this.cartId,
-            selectedShippingOptions: JSON.stringify(selectedShippingOptions),
-            shopperIp: this.shopperIp,
-          },
-        };
-        
-        // Step 7: Submit the Cart
-        const result = await this.submitCart({ applePayToken: paymentToken, paymentDetails });
-        console.log(result);
-        
-        // Complete the payment session
-        if (false) {
-          session.completePayment(ApplePaySession.STATUS_SUCCESS);
-        }
+      // Step 7: Submit the Cart
+      const result = await this.submitCart({ applePayToken: paymentToken, paymentDetails });
+      console.log(result);
+
+      // Complete the payment session
+      if (false) {
+        session.completePayment(ApplePaySession.STATUS_SUCCESS);
+      }
     };
 
     // Start the Apple Pay session
@@ -733,7 +755,7 @@ export class RyePay {
   private async updateBuyerIdentity(shippingAddress: google.payments.api.Address) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
-      Authorization: await this.getAuthHeader(),
+      Authorization: await this.authService.getAuthHeader(),
     };
 
     headers[ryeShopperIpHeaderKey] = '10.10.101.215';
@@ -907,7 +929,7 @@ export class RyePay {
           },
         };
 
-        const result = await this.submitCart({token: paymentToken, paymentDetails});
+        const result = await this.submitCart({ token: paymentToken, paymentDetails });
         onCartSubmitted?.(result.submitCart, result.errors);
       })
       .catch((error) => {
@@ -937,7 +959,7 @@ export class RyePay {
       'paymentMethod',
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
         this.log(`payment method token: ${token}`);
-        const result = await this.submitCart({token, paymentDetails});
+        const result = await this.submitCart({ token, paymentDetails });
         onCartSubmitted?.(result.submitCart, result.errors);
       }
     );
@@ -1055,7 +1077,7 @@ export class RyePay {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: await this.getAuthHeader(),
+        Authorization: await this.authService.getAuthHeader(),
       },
       body: JSON.stringify({
         query: this.envTokenQuery,
@@ -1066,8 +1088,7 @@ export class RyePay {
     return result.token;
   };
 
-
-  private async submitCart({token, paymentDetails, applePayToken} : SubmitCartParams) {
+  private async submitCart({ token, paymentDetails, applePayToken }: SubmitCartParams) {
     const input: CartApiSubmitInput = {
       token: token ?? 'apple_pay_token',
       applePayToken,
@@ -1093,7 +1114,7 @@ export class RyePay {
 
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
-      Authorization: await this.getAuthHeader(),
+      Authorization: await this.authService.getAuthHeader(),
     };
 
     if (paymentDetails.metadata.shopperIp) {
@@ -1122,16 +1143,6 @@ export class RyePay {
     return !!(globalThis as any).Spreedly;
   }
 
-  private async getAuthHeader() {
-    if (this.apiKey) {
-      return 'Basic ' + btoa(this.apiKey + ':');
-    }
-
-    const token = await this.generateJWT!();
-
-    return `Bearer ${token}`;
-  }
-
   private log = (...args: any) => {
     this.enableLogging && console.log(...args);
   };
@@ -1147,7 +1158,3 @@ export class RyePay {
     }
   }
 }
-
-
-// Create a server/webpage 
-// Create all certificates and merchant IDs for this
