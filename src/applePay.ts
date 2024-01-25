@@ -23,6 +23,9 @@ type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
   };
 };
 
+/* The ApplePay class is responsible for handling Apple Pay transactions, including initializing Apple
+Pay, validating the merchant, selecting shipping options, selecting shipping methods, and
+authorizing payment. */
 export class ApplePay {
   private readonly merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77';
   private readonly applePayServerUrl = 'https://apple-pay-server-ggymj6kjkq-uc.a.run.app';
@@ -60,6 +63,9 @@ export class ApplePay {
     this.cartService = CartService.getInstance(this.cartApiEndpoint);
   }
 
+  /**
+   * Load Apple Pay and fetch the cart subtotal and currency
+   */
   loadApplePay() {
     // Fetch cart subtotal and currency to create the ApplePay PaymentRequest body
     this.cartService
@@ -81,6 +87,10 @@ export class ApplePay {
       });
   }
 
+  /**
+   * Initialize Apple Pay by checking if the device supports it and creating an Apple Pay
+   * button if it does.
+   */
   private initializeApplePay() {
     if ((window as any).ApplePaySession) {
       const promise = ApplePaySession.canMakePaymentsWithActiveCard(this.merchantIdentifier);
@@ -103,6 +113,14 @@ export class ApplePay {
     }
   }
 
+  /**
+   * The function `updateAppleBuyerIdentity` updates the buyer's identity information for an Apple Pay
+   * transaction.
+   * @param shippingAddress - The `shippingAddress` parameter is an object of type
+   * `ApplePayPaymentContact` that contains information about the buyer's shipping address. It has the
+   * following properties:
+   * @returns the response from the API call as a JSON object.
+   */
   private async updateAppleBuyerIdentity(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
@@ -148,6 +166,15 @@ export class ApplePay {
     return await rawResponse.json();
   }
 
+  /**
+   * The function `getAppleShippingOptions` retrieves shipping options for an Apple Pay transaction
+   * based on the provided shipping address.
+   * @param shippingAddress - The `shippingAddress` parameter is of type
+   * `ApplePayJS.ApplePayPaymentContact` and represents the shipping address provided by the user
+   * during the Apple Pay checkout process.
+   * @returns an array of shipping options. Each shipping option is an object with properties such as
+   * identifier, label, detail, amount, and total.
+   */
   private async getAppleShippingOptions(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
     const content = await this.updateAppleBuyerIdentity(shippingAddress);
     const shippingOptions =
@@ -165,6 +192,12 @@ export class ApplePay {
     return shippingOptions;
   }
 
+  /**
+   * The `onValidateMerchant` function handles the validation of a merchant for Apple Pay.
+   * @param event - The `event` parameter in the `onValidateMerchant` function is of type
+   * `ApplePayJS.ApplePayValidateMerchantEvent`. This event is triggered when the Apple Pay session
+   * needs to validate the merchant.
+   */
   private async onValidateMerchant(event: ApplePayJS.ApplePayValidateMerchantEvent) {
     try {
       const result = await fetch(this.applePayServerUrl, {
@@ -187,6 +220,14 @@ export class ApplePay {
     }
   }
 
+  /**
+   * The function `onShippingContactSelected` handles the event when a shipping contact is selected in
+   * an Apple Pay session, retrieves shipping options based on the selected address, and completes the
+   * shipping contact selection process.
+   * @param event - The event parameter is of type ApplePayJS.ApplePayShippingContactSelectedEvent. It
+   * represents the event that is triggered when the user selects a shipping contact during the Apple
+   * Pay checkout process.
+   */
   private async onShippingContactSelected(event: ApplePayJS.ApplePayShippingContactSelectedEvent) {
     const shippingAddress = event.shippingContact;
     this.shippingOptions = await this.getAppleShippingOptions(shippingAddress);
@@ -203,6 +244,14 @@ export class ApplePay {
     );
   }
 
+  /**
+   * The `onShippingMethodSelected` function handles the event when a shipping method is selected in an
+   * Apple Pay session.
+   * @param event - The event parameter is of type ApplePayJS.ApplePayShippingMethodSelectedEvent. It
+   * represents the event that is triggered when a shipping method is selected by the user during the
+   * Apple Pay checkout process.
+   * @returns nothing (void).
+   */
   private async onShippingMethodSelected(event: ApplePayJS.ApplePayShippingMethodSelectedEvent) {
     this.selectedShippingMethod = event.shippingMethod;
     const finalAmount = this.shippingOptions.find(
@@ -226,6 +275,12 @@ export class ApplePay {
     );
   }
 
+  /**
+   * The `onPaymentAuthorized` function handles the authorization of an Apple Pay payment and submits
+   * the cart with the payment details.
+   * @param event - The `event` parameter is of type `ApplePayJS.ApplePayPaymentAuthorizedEvent`. It
+   * represents the event that is triggered when the payment is authorized in Apple Pay.
+   */
   private async onPaymentAuthorized(event: ApplePayJS.ApplePayPaymentAuthorizedEvent) {
     const shippingAddress = event.payment.shippingContact;
     const updateBuyerIdentity = await this.updateAppleBuyerIdentity(shippingAddress!);
@@ -266,13 +321,19 @@ export class ApplePay {
       applePayToken: paymentToken,
       paymentDetails,
     });
-    this.onCartSubmitted?.(result.submitCart, result.errors);
 
-    if (false) {
-      this.applePaySession?.completePayment(ApplePaySession.STATUS_SUCCESS);
-    }
+    this.onCartSubmitted?.(result.submitCart, result.errors);
+    this.applePaySession?.completePayment(
+      result.error ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
+    );
   }
 
+  /**
+   * The function handles the process of initiating an Apple Pay session and performing various
+   * actions during the session, such as validating the merchant, selecting shipping options, selecting
+   * shipping methods, and authorizing payment.
+   * @returns nothing (undefined).
+   */
   private async onApplePayClicked() {
     // Check for ApplePaySession availability
     if (typeof ApplePaySession === 'undefined') {
