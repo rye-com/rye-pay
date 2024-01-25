@@ -481,19 +481,24 @@ export class RyePay {
       this.loadAndInitializeGooglePay(params.onCartSubmitted);
     }
 
-    // Initialize GooglePay if the button is present
+    // Initialize ApplePay if the button is present
     if (document.getElementById('rye-apple-pay')) {
-      const applePay = new ApplePay({
-        cartApiEndpoint: this.cartApiEndpoint,
-        applePayInputParams: applePayInputParams,
-        updateBuyerIdentityMutation: this.updateBuyerIdentityMutation,
-        ryeShopperIpHeaderKey: ryeShopperIpHeaderKey,
-        submitCart: this.submitCart,
-        onCartSubmitted: params.onCartSubmitted,
-        log: this.log,
-      });
+      // If ApplePayInputParams are not set, apple pay cannot be instantiated
+      if (!applePayInputParams) {
+        this.log('applePayInputParams must be provided');
+      } else {
+        const applePay = new ApplePay({
+          cartApiEndpoint: this.cartApiEndpoint,
+          applePayInputParams: applePayInputParams,
+          updateBuyerIdentityMutation: this.updateBuyerIdentityMutation,
+          ryeShopperIpHeaderKey: ryeShopperIpHeaderKey,
+          submitCart: this.submitCart,
+          onCartSubmitted: params.onCartSubmitted,
+          log: this.log,
+        });
 
-      applePay.loadApplePay();
+        applePay.loadApplePay();
+      }
     }
   }
 

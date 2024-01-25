@@ -1,15 +1,26 @@
 import { AuthService } from './authService';
 import { CartService } from './cartService';
-import { ApplePayInputParams, InitParams, SpreedlyAdditionalFields, SubmitCartParams } from './rye-pay';
+import {
+  ApplePayInputParams,
+  InitParams,
+  SpreedlyAdditionalFields,
+  SubmitCartParams,
+} from './rye-pay';
 
 export type ApplePayParams = {
   cartApiEndpoint: string;
-  applePayInputParams?: ApplePayInputParams
+  applePayInputParams: ApplePayInputParams;
   updateBuyerIdentityMutation: string;
   ryeShopperIpHeaderKey: string;
   submitCart: (params: SubmitCartParams) => Promise<any>;
   onCartSubmitted: InitParams['onCartSubmitted'];
   log: (...args: any) => void;
+};
+
+type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
+  total: {
+    amount: string;
+  };
 };
 
 export class ApplePay {
@@ -19,17 +30,18 @@ export class ApplePay {
     'https://applepay.cdn-apple.com/jsapi/v1.1.0/apple-pay-sdk.js';
 
   private cartApiEndpoint: string;
-  private applePayInputParams?: ApplePayInputParams;
+  private applePayInputParams: ApplePayInputParams;
   private updateBuyerIdentityMutation: string;
   private ryeShopperIpHeaderKey: string;
   private onCartSubmitted: InitParams['onCartSubmitted'];
   private log: (...args: any) => void;
-
   private applePaySession: ApplePaySession | undefined;
-  private shippingOptions: ApplePayJS.ApplePayShippingMethod[] = [];
+  private shippingOptions: RyeAppleShippingMethod[] = [];
   private selectedShippingMethod: ApplePayJS.ApplePayShippingMethod | undefined;
   private authService = AuthService.getInstance();
   private cartService: CartService;
+  private cartSubtotal: number | undefined;
+  private cartCurrency: string = 'USD';
 
   constructor({
     cartApiEndpoint,
@@ -49,13 +61,24 @@ export class ApplePay {
   }
 
   loadApplePay() {
-    const applePayScript = document.createElement('script');
-    applePayScript.src = this.applePayScriptUrl;
-    document.head.appendChild(applePayScript);
+    // Fetch cart subtotal and currency to create the ApplePay PaymentRequest body
+    this.cartService
+      .getCart(this.applePayInputParams.cartId, this.applePayInputParams.shopperIp)
+      .then((result) => {
+        this.cartSubtotal = Number(result.cart.cost.subtotal.value) / 100;
+        this.cartCurrency = result.cart.cost.subtotal.currency;
 
-    applePayScript.onload = () => {
-      this.initializeApplePay();
-    };
+        // Show the Apple Pay button
+        const applePayScript = document.createElement('script');
+        applePayScript.src = this.applePayScriptUrl;
+        document.head.appendChild(applePayScript);
+        applePayScript.onload = () => {
+          this.initializeApplePay();
+        };
+      })
+      .catch((error) => {
+        this.log(`Error fetching cart cost: ${error}`);
+      });
   }
 
   private initializeApplePay() {
@@ -68,7 +91,7 @@ export class ApplePay {
           const button = document.createElement('apple-pay-button');
           button.setAttribute('buttonstyle', 'black');
           button.setAttribute('type', 'buy');
-          button.onclick = () => this.onApplePayClicked();
+          button.onclick = async () => await this.onApplePayClicked();
 
           if (buttonContainer) {
             buttonContainer.appendChild(button);
@@ -86,7 +109,7 @@ export class ApplePay {
       Authorization: await this.authService.getAuthHeader(),
     };
 
-    headers[this.ryeShopperIpHeaderKey] = this.applePayInputParams!.shopperIp;
+    headers[this.ryeShopperIpHeaderKey] = this.applePayInputParams.shopperIp;
 
     let buyerIdentity: any = {
       provinceCode: shippingAddress.administrativeArea ?? '',
@@ -115,7 +138,7 @@ export class ApplePay {
         query: this.updateBuyerIdentityMutation,
         variables: {
           input: {
-            id: this.applePayInputParams!.cartId,
+            id: this.applePayInputParams.cartId,
             buyerIdentity: buyerIdentity,
           },
         },
@@ -134,7 +157,10 @@ export class ApplePay {
           identifier: shippingMethod.id,
           label: shippingMethod.label,
           detail: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
-          amount: Number(shippingMethod.total.value) / 100,
+          amount: Number(shippingMethod.price.value) / 100,
+          total: {
+            amount: Number(shippingMethod.total.value) / 100,
+          },
         })) ?? [];
     return shippingOptions;
   }
@@ -149,8 +175,8 @@ export class ApplePay {
         },
         body: JSON.stringify({
           appleValidationUrl: event.validationURL,
-          merchantDisplayName: this.applePayInputParams?.merchantDisplayName ?? '',
-          merchantDomain: this.applePayInputParams?.merchantDomain ?? '',
+          merchantDisplayName: this.applePayInputParams.merchantDisplayName ?? '',
+          merchantDomain: this.applePayInputParams.merchantDomain ?? '',
         }),
       });
 
@@ -165,8 +191,8 @@ export class ApplePay {
     const shippingAddress = event.shippingContact;
     this.shippingOptions = await this.getAppleShippingOptions(shippingAddress);
     const newTotal = {
-      label: 'Your Merchant Name',
-      amount: '10.00',
+      label: this.applePayInputParams.merchantDisplayName ?? '',
+      amount: `${this.cartSubtotal}`,
     };
 
     this.applePaySession?.completeShippingContactSelection(
@@ -179,9 +205,18 @@ export class ApplePay {
 
   private async onShippingMethodSelected(event: ApplePayJS.ApplePayShippingMethodSelectedEvent) {
     this.selectedShippingMethod = event.shippingMethod;
+    const finalAmount = this.shippingOptions.find(
+      (option) => option.identifier === this.selectedShippingMethod?.identifier
+    )?.total.amount;
+
+    if (!finalAmount) {
+      this.log('Error calculating total cost including shipping method');
+      return;
+    }
+
     const newTotal = {
-      label: this.selectedShippingMethod.label,
-      amount: this.selectedShippingMethod.amount,
+      label: this.applePayInputParams.merchantDisplayName ?? '',
+      amount: finalAmount,
     };
 
     this.applePaySession?.completeShippingMethodSelection(
@@ -221,41 +256,38 @@ export class ApplePay {
       zip: shippingAddress?.postalCode ?? '',
       country: shippingAddress?.countryCode ?? '',
       metadata: {
-        cartId: this.applePayInputParams!.cartId,
+        cartId: this.applePayInputParams.cartId,
         selectedShippingOptions: JSON.stringify(selectedShippingOptions),
-        shopperIp: this.applePayInputParams!.shopperIp,
+        shopperIp: this.applePayInputParams.shopperIp,
       },
     };
 
-    // Step 7: Submit the Cart
     const result = await this.cartService.submitCart({
       applePayToken: paymentToken,
       paymentDetails,
     });
     this.onCartSubmitted?.(result.submitCart, result.errors);
 
-    // Complete the payment session
     if (false) {
       this.applePaySession?.completePayment(ApplePaySession.STATUS_SUCCESS);
     }
   }
 
-  private onApplePayClicked() {
+  private async onApplePayClicked() {
     // Check for ApplePaySession availability
     if (typeof ApplePaySession === 'undefined') {
       this.log('Apple Pay is not available on this device/browser.');
       return;
     }
-
     // Define the Apple Pay payment request
     const paymentRequest = {
       countryCode: 'US',
-      currencyCode: 'USD',
+      currencyCode: this.cartCurrency,
       supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
       merchantCapabilities: ['supports3DS'] as ApplePayJS.ApplePayMerchantCapability[],
       total: {
-        label: 'Your Merchant Name',
-        amount: '10.00', // Example amount
+        label: this.applePayInputParams.merchantDisplayName ?? '',
+        amount: `${this.cartSubtotal}`,
       },
       requiredShippingContactFields: [
         'email',
