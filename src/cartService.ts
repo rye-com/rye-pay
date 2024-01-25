@@ -23,6 +23,7 @@ export class CartService {
     if (!CartService.instance) {
       CartService.instance = new CartService(cartApiEndpoint);
     }
+
     return CartService.instance;
   }
 
@@ -32,7 +33,7 @@ export class CartService {
     applePayToken,
   }: SubmitCartParams): Promise<any> {
     const input: CartApiSubmitInput = {
-      token: token ?? 'apple_pay_token',
+      token: token ?? 'payment_token',
       applePayToken,
       id: paymentDetails.metadata.cartId,
       billingAddress: {

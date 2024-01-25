@@ -3,8 +3,6 @@ export class AuthService {
   private apiKey?: string;
   private generateJWT?: () => Promise<string>;
 
-  private constructor() {}
-
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
       AuthService.instance = new AuthService();

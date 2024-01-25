@@ -274,24 +274,17 @@ export class ApplePay {
     this.applePaySession = new ApplePaySession(3, paymentRequest);
 
     // Validate merchant
-    this.applePaySession.onvalidatemerchant = (event) => {
-      return this.onValidateMerchant(event);
-    };
+    this.applePaySession.onvalidatemerchant = (event) => this.onValidateMerchant(event);
 
     // Fetch shipping options when shipping contact is selected or changed
-    this.applePaySession.onshippingcontactselected = (event) => {
-      return this.onShippingContactSelected(event);
-    };
+    this.applePaySession.onshippingcontactselected = (event) =>
+      this.onShippingContactSelected(event);
 
     // Update shipping method when shipping method is selected or changed
-    this.applePaySession.onshippingmethodselected = (event) => {
-      return this.onShippingMethodSelected(event);
-    };
+    this.applePaySession.onshippingmethodselected = (event) => this.onShippingMethodSelected(event);
 
     // Authorize payment
-    this.applePaySession.onpaymentauthorized = (event) => {
-      return this.onPaymentAuthorized(event);
-    };
+    this.applePaySession.onpaymentauthorized = (event) => this.onPaymentAuthorized(event);
 
     // Start the Apple Pay session
     try {
