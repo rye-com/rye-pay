@@ -27,7 +27,7 @@ type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
 Pay, validating the merchant, selecting shipping options, selecting shipping methods, and
 authorizing payment. */
 export class ApplePay {
-  private readonly merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77';
+  private readonly merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77'; // TODO: change it to a production identifier
   private readonly applePayServerUrl = 'https://apple-pay-server-ggymj6kjkq-uc.a.run.app';
   private readonly applePayScriptUrl =
     'https://applepay.cdn-apple.com/jsapi/v1.1.0/apple-pay-sdk.js';
