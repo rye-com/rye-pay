@@ -98,6 +98,14 @@ export interface InitParams extends SpreedlyInitParams {
   environment?: Environment;
   cartId?: string;
   shopperIp?: string;
+  applePayInputParams?: ApplePayInputParams;
+}
+
+export interface ApplePayInputParams {
+  cartId: string;
+  shopperIp: string;
+  merchantDisplayName: string;
+  merchantDomain: string;
 }
 
 interface SubmitAdditionalFields {
@@ -385,6 +393,7 @@ export class RyePay {
       onErrors,
       enableLogging = false,
       environment = 'prod',
+      applePayInputParams,
     } = params;
     if (this.initializing) {
       return;
@@ -476,8 +485,7 @@ export class RyePay {
     if (document.getElementById('rye-apple-pay')) {
       const applePay = new ApplePay({
         cartApiEndpoint: this.cartApiEndpoint,
-        cartId: this.cartId,
-        shopperIp: this.shopperIp,
+        applePayInputParams: applePayInputParams,
         updateBuyerIdentityMutation: this.updateBuyerIdentityMutation,
         ryeShopperIpHeaderKey: ryeShopperIpHeaderKey,
         submitCart: this.submitCart,

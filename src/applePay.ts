@@ -1,11 +1,10 @@
 import { AuthService } from './authService';
 import { CartService } from './cartService';
-import { InitParams, SpreedlyAdditionalFields, SubmitCartParams } from './rye-pay';
+import { ApplePayInputParams, InitParams, SpreedlyAdditionalFields, SubmitCartParams } from './rye-pay';
 
 export type ApplePayParams = {
   cartApiEndpoint: string;
-  cartId: string;
-  shopperIp: string;
+  applePayInputParams?: ApplePayInputParams
   updateBuyerIdentityMutation: string;
   ryeShopperIpHeaderKey: string;
   submitCart: (params: SubmitCartParams) => Promise<any>;
@@ -14,12 +13,13 @@ export type ApplePayParams = {
 };
 
 export class ApplePay {
+  private readonly merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77';
+  private readonly applePayServerUrl = 'https://apple-pay-server-ggymj6kjkq-uc.a.run.app';
   private readonly applePayScriptUrl =
     'https://applepay.cdn-apple.com/jsapi/v1.1.0/apple-pay-sdk.js';
 
   private cartApiEndpoint: string;
-  private cartId: string;
-  private shopperIp: string;
+  private applePayInputParams?: ApplePayInputParams;
   private updateBuyerIdentityMutation: string;
   private ryeShopperIpHeaderKey: string;
   private onCartSubmitted: InitParams['onCartSubmitted'];
@@ -33,16 +33,14 @@ export class ApplePay {
 
   constructor({
     cartApiEndpoint,
-    cartId,
-    shopperIp,
+    applePayInputParams,
     updateBuyerIdentityMutation,
     ryeShopperIpHeaderKey,
     onCartSubmitted,
     log,
   }: ApplePayParams) {
     this.cartApiEndpoint = cartApiEndpoint;
-    this.cartId = cartId;
-    this.shopperIp = shopperIp;
+    this.applePayInputParams = applePayInputParams;
     this.updateBuyerIdentityMutation = updateBuyerIdentityMutation;
     this.ryeShopperIpHeaderKey = ryeShopperIpHeaderKey;
     this.onCartSubmitted = onCartSubmitted;
@@ -62,8 +60,7 @@ export class ApplePay {
 
   private initializeApplePay() {
     if ((window as any).ApplePaySession) {
-      var merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77';
-      var promise = ApplePaySession.canMakePaymentsWithActiveCard(merchantIdentifier);
+      const promise = ApplePaySession.canMakePaymentsWithActiveCard(this.merchantIdentifier);
       promise.then((canMakePayments) => {
         if (canMakePayments) {
           // Create Apple Pay button
@@ -89,7 +86,7 @@ export class ApplePay {
       Authorization: await this.authService.getAuthHeader(),
     };
 
-    headers[this.ryeShopperIpHeaderKey] = this.shopperIp;
+    headers[this.ryeShopperIpHeaderKey] = this.applePayInputParams!.shopperIp;
 
     let buyerIdentity: any = {
       provinceCode: shippingAddress.administrativeArea ?? '',
@@ -118,7 +115,7 @@ export class ApplePay {
         query: this.updateBuyerIdentityMutation,
         variables: {
           input: {
-            id: this.cartId,
+            id: this.applePayInputParams!.cartId,
             buyerIdentity: buyerIdentity,
           },
         },
@@ -144,8 +141,7 @@ export class ApplePay {
 
   private async onValidateMerchant(event: ApplePayJS.ApplePayValidateMerchantEvent) {
     try {
-      const applePayServerUrl = 'https://apple-pay-server-ggymj6kjkq-uc.a.run.app';
-      const result = await fetch(applePayServerUrl, {
+      const result = await fetch(this.applePayServerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,8 +149,8 @@ export class ApplePay {
         },
         body: JSON.stringify({
           appleValidationUrl: event.validationURL,
-          merchantDisplayName: 'Rye',
-          merchantDomain: 'applepay.ngrok.app',
+          merchantDisplayName: this.applePayInputParams?.merchantDisplayName ?? '',
+          merchantDomain: this.applePayInputParams?.merchantDomain ?? '',
         }),
       });
 
@@ -225,9 +221,9 @@ export class ApplePay {
       zip: shippingAddress?.postalCode ?? '',
       country: shippingAddress?.countryCode ?? '',
       metadata: {
-        cartId: this.cartId,
+        cartId: this.applePayInputParams!.cartId,
         selectedShippingOptions: JSON.stringify(selectedShippingOptions),
-        shopperIp: this.shopperIp,
+        shopperIp: this.applePayInputParams!.shopperIp,
       },
     };
 
