@@ -1,12 +1,23 @@
 import { AuthService } from './authService';
 import {
   CartApiSubmitInput,
+  GetCartResult,
   GraphQLError,
   SubmitCartParams,
   SubmitCartResult,
   cartSubmitResponse,
   ryeShopperIpHeaderKey,
 } from './rye-pay';
+
+type SubmitCartMutationResult = {
+  submitCart: SubmitCartResult;
+  errors: GraphQLError[];
+};
+
+type GetCartQueryResult = {
+  cart: GetCartResult;
+  errors: GraphQLError[];
+};
 
 /* The `CartService` class is a TypeScript class that provides methods for interacting with a cart API,
 including retrieving cart data and submitting a cart for payment. */
@@ -44,9 +55,7 @@ export class CartService {
    * of a cart. It is used to retrieve the cart information from the server.
    * @param {string} shopperIp - The `shopperIp` parameter is the IP address of the shopper. It is used
    * as a header in the request to the cart API.
-   * @returns The function `getCart` returns an object with two properties: `cart` and `errors`. The
-   * `cart` property contains the cart data retrieved from the API, while the `errors` property
-   * contains any errors encountered during the API call.
+   * @returns {GetCartQueryResult} - the cart data and any potential errors.
    */
   public async getCart(cartId: string, shopperIp: string): Promise<any> {
     const headers: RequestInit['headers'] = {
@@ -67,8 +76,8 @@ export class CartService {
     });
 
     const content = await rawResponse.json();
-    const result = {
-      cart: content?.data?.getCart?.cart as SubmitCartResult,
+    const result: GetCartQueryResult = {
+      cart: content?.data?.getCart?.cart as GetCartResult,
       errors: content?.data?.getCart?.errors as GraphQLError[],
     };
 
@@ -80,9 +89,7 @@ export class CartService {
    * the result.
    * @param {SubmitCartParams}  - - `token`: A string representing the payment token. If not provided,
    * it defaults to 'payment_token'.
-   * @returns an object with two properties: "submitCart" and "errors". The "submitCart" property
-   * contains the result of the "submitCart" mutation, while the "errors" property contains any errors
-   * that occurred during the mutation.
+   * @returns {SubmitCartMutationResult} - the submitCart result and any potential errors.
    */
   public async submitCart({
     token,
@@ -132,9 +139,9 @@ export class CartService {
       }),
     });
     const content = await rawResponse.json();
-    const result = {
-      submitCart: content?.data?.submitCart as SubmitCartResult,
-      errors: content.errors as GraphQLError[],
+    const result: SubmitCartMutationResult = {
+      submitCart: content?.data?.submitCart,
+      errors: content.errors,
     };
     return result;
   }

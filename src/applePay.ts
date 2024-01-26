@@ -12,6 +12,7 @@ import {
   SpreedlyAdditionalFields,
   SubmitCartParams,
 } from './rye-pay';
+import { ShippingMethod, RyeStore } from './types';
 
 export type ApplePayParams = {
   cartApiEndpoint: string;
@@ -129,7 +130,12 @@ export class ApplePay {
     }
     // Define the Apple Pay payment request
     const merchantCapabilities: ApplePayJS.ApplePayMerchantCapability[] = ['supports3DS'];
-    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = ['email', 'name', 'phone', 'postalAddress'];
+    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = [
+      'email',
+      'name',
+      'phone',
+      'postalAddress',
+    ];
     const paymentRequest: ApplePayJS.ApplePayPaymentRequest = {
       countryCode: 'US',
       currencyCode: this.cartCurrency,
@@ -262,13 +268,13 @@ export class ApplePay {
     const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
 
     const selectedShippingOptions =
-      updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
+      updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: RyeStore) => {
         const option = store.offer.shippingMethods.find(
-          (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+          (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId
         );
         return {
           store: store.store,
-          shippingId: option.id,
+          shippingId: option?.id,
         };
       });
 
@@ -338,8 +344,6 @@ export class ApplePay {
       };
     }
 
-    console.log('buyerIdentity', buyerIdentity);
-
     const rawResponse = await fetch(this.cartApiEndpoint, {
       method: 'POST',
       headers,
@@ -371,7 +375,7 @@ export class ApplePay {
     const shippingOptions =
       content?.data?.updateCartBuyerIdentity?.cart?.stores
         ?.at(0)
-        ?.offer?.shippingMethods?.map((shippingMethod: any) => ({
+        ?.offer?.shippingMethods?.map((shippingMethod: ShippingMethod) => ({
           identifier: shippingMethod.id,
           label: shippingMethod.label,
           detail: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
