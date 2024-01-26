@@ -488,7 +488,6 @@ export class RyePay {
         const applePay = new ApplePay({
           cartApiEndpoint: this.cartApiEndpoint,
           applePayInputParams: applePayInputParams,
-          ryeShopperIpHeaderKey: ryeShopperIpHeaderKey,
           submitCart: this.submitCart,
           onCartSubmitted: params.onCartSubmitted,
           log: this.log,

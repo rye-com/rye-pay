@@ -86,6 +86,22 @@ export class CartService {
     return result;
   }
 
+  /**
+   * The function `updateBuyerIdentity` updates the buyer's identity information in a shopping cart
+   * based on the provided parameters.
+   * @param {string} cartId - The `cartId` parameter is a string that represents the ID of the shopping
+   * cart.
+   * @param {string} shopperIp - The `shopperIp` parameter is the IP address of the shopper making the
+   * purchase. It is used for tracking and security purposes.
+   * @param {google.payments.api.Address | ApplePayJS.ApplePayPaymentContact} shippingAddress - The
+   * `shippingAddress` parameter is an object that represents the shipping address of the buyer. It can
+   * be either a `google.payments.api.Address` object or an `ApplePayJS.ApplePayPaymentContact` object,
+   * depending on the payment type.
+   * @param {PAYMENT_TYPE} paymentType - The `paymentType` parameter is a variable of type
+   * `PAYMENT_TYPE`. It is used to determine the type of payment being used, either `APPLE_PAY` or
+   * `GOOGLE_PAY`.
+   * @returns the response from the API call as a JSON object.
+   */
   public async updateBuyerIdentity(
     cartId: string,
     shopperIp: string,

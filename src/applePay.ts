@@ -17,7 +17,6 @@ import { ShippingMethod, RyeStore } from './types';
 export type ApplePayParams = {
   cartApiEndpoint: string;
   applePayInputParams: ApplePayInputParams;
-  ryeShopperIpHeaderKey: string;
   submitCart: (params: SubmitCartParams) => Promise<any>;
   onCartSubmitted: InitParams['onCartSubmitted'];
   log: (...args: any) => void;
@@ -44,13 +43,7 @@ export class ApplePay {
   private cartSubtotal: number | undefined;
   private cartCurrency: string = 'USD';
 
-  constructor({
-    cartApiEndpoint,
-    applePayInputParams,
-    ryeShopperIpHeaderKey,
-    onCartSubmitted,
-    log,
-  }: ApplePayParams) {
+  constructor({ cartApiEndpoint, applePayInputParams, onCartSubmitted, log }: ApplePayParams) {
     this.cartApiEndpoint = cartApiEndpoint;
     this.applePayInputParams = applePayInputParams;
     this.onCartSubmitted = onCartSubmitted;
