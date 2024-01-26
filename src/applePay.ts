@@ -4,6 +4,7 @@ import {
   APPLE_PAY_MERCHANT_IDENTIFIER,
   APPLE_PAY_SCRIPT_URL,
   APPLE_PAY_SERVER_URL,
+  APPLE_PAY_VERSION,
 } from './constants';
 import {
   ApplePayInputParams,
@@ -127,26 +128,23 @@ export class ApplePay {
       return;
     }
     // Define the Apple Pay payment request
-    const paymentRequest = {
+    const merchantCapabilities: ApplePayJS.ApplePayMerchantCapability[] = ['supports3DS'];
+    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = ['email', 'name', 'phone', 'postalAddress'];
+    const paymentRequest: ApplePayJS.ApplePayPaymentRequest = {
       countryCode: 'US',
       currencyCode: this.cartCurrency,
       supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
-      merchantCapabilities: ['supports3DS'] as ApplePayJS.ApplePayMerchantCapability[],
+      merchantCapabilities,
       total: {
         label: this.applePayInputParams.merchantDisplayName ?? '',
         amount: `${this.cartSubtotal}`,
       },
-      requiredShippingContactFields: [
-        'email',
-        'name',
-        'phone',
-        'postalAddress',
-      ] as ApplePayJS.ApplePayContactField[],
+      requiredShippingContactFields,
       shippingMethods: [],
     };
 
     // Create an ApplePaySession
-    this.applePaySession = new ApplePaySession(3, paymentRequest);
+    this.applePaySession = new ApplePaySession(APPLE_PAY_VERSION, paymentRequest);
 
     // Validate merchant
     this.applePaySession.onvalidatemerchant = (event) => this.onValidateMerchant(event);
@@ -185,8 +183,8 @@ export class ApplePay {
         },
         body: JSON.stringify({
           appleValidationUrl: event.validationURL,
-          merchantDisplayName: this.applePayInputParams.merchantDisplayName ?? '',
-          merchantDomain: this.applePayInputParams.merchantDomain ?? '',
+          merchantDisplayName: this.applePayInputParams.merchantDisplayName,
+          merchantDomain: this.applePayInputParams.merchantDomain,
         }),
       });
 
@@ -279,8 +277,8 @@ export class ApplePay {
       first_name: shippingAddress?.givenName ?? '',
       last_name: shippingAddress?.familyName ?? '',
       phone_number: shippingAddress?.phoneNumber ?? '',
-      month: '',
-      year: '',
+      month: '', // For Apple Pay we don't need to pass in CC month
+      year: '', // For Apple Pay we don't need to pass in CC year
       address1: shippingAddress?.addressLines?.at(0) ?? '',
       address2: shippingAddress?.addressLines?.at(1) ?? '',
       city: shippingAddress?.locality ?? '',
@@ -309,8 +307,7 @@ export class ApplePay {
    * The function `updateAppleBuyerIdentity` updates the buyer's identity information for an Apple Pay
    * transaction.
    * @param shippingAddress - The `shippingAddress` parameter is an object of type
-   * `ApplePayPaymentContact` that contains information about the buyer's shipping address. It has the
-   * following properties:
+   * `ApplePayPaymentContact` that contains information about the buyer's shipping address.
    * @returns the response from the API call as a JSON object.
    */
   private async updateAppleBuyerIdentity(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
@@ -321,25 +318,27 @@ export class ApplePay {
 
     headers[this.ryeShopperIpHeaderKey] = this.applePayInputParams.shopperIp;
 
+    // When this is set, the information could be complete or partially redacted
     let buyerIdentity: any = {
       provinceCode: shippingAddress.administrativeArea ?? '',
       countryCode: shippingAddress?.countryCode ?? '',
       postalCode: shippingAddress?.postalCode ?? '',
     };
 
+    // When given name exists, the information is complete
     if (shippingAddress.givenName) {
       buyerIdentity = {
+        ...buyerIdentity,
         firstName: shippingAddress.givenName ?? '',
         lastName: shippingAddress.familyName ?? '',
         phone: shippingAddress?.phoneNumber,
         address1: shippingAddress?.addressLines?.at(0) ?? '',
         address2: shippingAddress?.addressLines?.at(1) ?? '',
         city: shippingAddress?.locality ?? '',
-        provinceCode: shippingAddress?.administrativeArea ?? '',
-        countryCode: shippingAddress?.countryCode ?? '',
-        postalCode: shippingAddress?.postalCode ?? '',
       };
     }
+
+    console.log('buyerIdentity', buyerIdentity);
 
     const rawResponse = await fetch(this.cartApiEndpoint, {
       method: 'POST',
