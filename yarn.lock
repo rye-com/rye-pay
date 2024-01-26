@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@types/applepayjs@^14.0.3":
+  version "14.0.3"
+  resolved "https://registry.npmjs.org/@types/applepayjs/-/applepayjs-14.0.3.tgz"
+  integrity sha512-3ketgiX96+ZbFpK1/aCvEAEHUlPsuBt7cv1VCUVYZfWEekvn6oKaTtzK4G+CUINOQwh+1U5QwFb270xhOn94gA==
+
 "@types/googlepay@^0.7.5":
   version "0.7.5"
   resolved "https://registry.npmjs.org/@types/googlepay/-/googlepay-0.7.5.tgz"

@@ -1,3 +1,6 @@
+import { ApplePay } from './applePay';
+import { AuthService } from './authService';
+
 // Original Spreedly interface (only used api covered)
 interface Spreedly {
   init: (envToken: string, params: SpreedlyInitParams) => void;
@@ -38,7 +41,7 @@ interface FrameError {
   col: number;
 }
 
-interface GraphQLError {
+export interface GraphQLError {
   message: string;
 }
 
@@ -75,7 +78,7 @@ type FrameEventType =
 type Environment = 'prod' | 'stage' | 'local';
 
 // RyePay params for init method
-interface InitParams extends SpreedlyInitParams {
+export interface InitParams extends SpreedlyInitParams {
   apiKey?: string;
   generateJWT?: () => Promise<string>;
   numberEl: string;
@@ -95,6 +98,14 @@ interface InitParams extends SpreedlyInitParams {
   environment?: Environment;
   cartId?: string;
   shopperIp?: string;
+  applePayInputParams?: ApplePayInputParams;
+}
+
+export interface ApplePayInputParams {
+  cartId: string;
+  shopperIp: string;
+  merchantDisplayName: string; // The merchant display name that appears on the Apple Pay sheet.
+  merchantDomain: string; // The domain on which the Apple Pay button will appear on.
 }
 
 interface SubmitAdditionalFields {
@@ -119,7 +130,7 @@ interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
 }
 
 // Additional fields that can be submitted together with credit card details
-interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
+export interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
   metadata: {
     cartId: string;
     selectedShippingOptions?: string;
@@ -133,12 +144,30 @@ interface StorePromoCodes {
   promoCodes: string[];
 }
 
-interface CartApiSubmitInput {
+export interface CartApiSubmitInput {
   id: string;
   token: string;
+  applePayToken?: ApplePayToken;
   billingAddress: BillingAddress;
   selectedShippingOptions?: SelectedShippingOption[];
   experimentalPromoCodes?: StorePromoCodes[];
+}
+
+export interface SubmitCartParams {
+  token?: string;
+  paymentDetails: SpreedlyAdditionalFields;
+  applePayToken?: ApplePayToken;
+}
+
+interface ApplePayToken {
+  version: string;
+  data: string;
+  signature: string;
+  header: {
+    ephemeralPublicKey: string;
+    publicKeyHash: string;
+    transactionId: string;
+  };
 }
 
 export interface SelectedShippingOption {
@@ -160,6 +189,16 @@ interface BillingAddress {
 
 export interface EnvTokenResult {
   token: string;
+}
+
+export interface GetCartResult {
+  id: string;
+  cost: {
+    subtotal: {
+      value: number;
+      currency: string;
+    };
+  };
 }
 
 export interface SubmitCartResult {
@@ -259,9 +298,9 @@ const prodCartApiEndpoint =
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
 const localCartApiEndpoint = 'http://localhost:3000/v1/query';
-const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
+export const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
-const cartSubmitResponse = `
+export const cartSubmitResponse = `
 cart {
   id,
   stores {
@@ -312,13 +351,12 @@ export class RyePay {
   }`;
   private cartApiEndpoint = prodCartApiEndpoint;
   private spreedly!: Spreedly;
-  private apiKey?: string;
-  private generateJWT?: () => Promise<string>;
   private enableLogging: boolean = false;
   private googlePayConfig: any;
   private googlePayFinalPrice: number = 0;
   private googlePayFinalCurrency: string = 'USD';
   private googlePayShippingOptions: any[] = [];
+  private authService!: AuthService;
   private cartId = '';
   private shopperIp = '';
 
@@ -365,6 +403,7 @@ export class RyePay {
       onErrors,
       enableLogging = false,
       environment = 'prod',
+      applePayInputParams,
     } = params;
     if (this.initializing) {
       return;
@@ -376,6 +415,7 @@ export class RyePay {
     this.initializing = true;
     this.cartId = params.cartId ?? '';
     this.shopperIp = params.shopperIp ?? '';
+    this.authService = AuthService.getInstance();
 
     if (!apiKey && !generateJWT) {
       const errorMsg = 'Either apiKey or generateJWT must be provided';
@@ -397,12 +437,18 @@ export class RyePay {
       throw new Error(errorMsg);
     }
 
+    // Set the API Key or JWT Generator in the AuthService
+    if (params.apiKey) {
+      this.authService.setApiKey(params.apiKey);
+    }
+    if (params.generateJWT) {
+      this.authService.setGenerateJWT(params.generateJWT);
+    }
+
     if (this.hasSpreedlyGlobal()) {
       return;
     }
 
-    this.apiKey = apiKey;
-    this.generateJWT = generateJWT;
     this.enableLogging = enableLogging;
     this.cartApiEndpoint = this.getCartApiEndpoint(environment);
 
@@ -444,6 +490,26 @@ export class RyePay {
     if (document.getElementById('rye-google-pay')) {
       this.loadAndInitializeGooglePay(params.onCartSubmitted);
     }
+
+    // Initialize ApplePay if the button is present
+    if (document.getElementById('rye-apple-pay')) {
+      // If ApplePayInputParams are not set, apple pay cannot be instantiated
+      if (!applePayInputParams) {
+        this.log('applePayInputParams must be provided');
+      } else {
+        const applePay = new ApplePay({
+          cartApiEndpoint: this.cartApiEndpoint,
+          applePayInputParams: applePayInputParams,
+          updateBuyerIdentityMutation: this.updateBuyerIdentityMutation,
+          ryeShopperIpHeaderKey: ryeShopperIpHeaderKey,
+          submitCart: this.submitCart,
+          onCartSubmitted: params.onCartSubmitted,
+          log: this.log,
+        });
+
+        applePay.loadApplePay();
+      }
+    }
   }
 
   private loadAndInitializeGooglePay(onCartSubmitted: InitParams['onCartSubmitted']) {
@@ -481,7 +547,7 @@ export class RyePay {
   private async updateBuyerIdentity(shippingAddress: google.payments.api.Address) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
-      Authorization: await this.getAuthHeader(),
+      Authorization: await this.authService.getAuthHeader(),
     };
 
     headers[ryeShopperIpHeaderKey] = '10.10.101.215';
@@ -655,7 +721,7 @@ export class RyePay {
           },
         };
 
-        const result = await this.submitCart(paymentToken, paymentDetails);
+        const result = await this.submitCart({ token: paymentToken, paymentDetails });
         onCartSubmitted?.(result.submitCart, result.errors);
       })
       .catch((error) => {
@@ -685,7 +751,7 @@ export class RyePay {
       'paymentMethod',
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
         this.log(`payment method token: ${token}`);
-        const result = await this.submitCart(token, paymentDetails);
+        const result = await this.submitCart({ token, paymentDetails });
         onCartSubmitted?.(result.submitCart, result.errors);
       }
     );
@@ -803,7 +869,7 @@ export class RyePay {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: await this.getAuthHeader(),
+        Authorization: await this.authService.getAuthHeader(),
       },
       body: JSON.stringify({
         query: this.envTokenQuery,
@@ -814,9 +880,10 @@ export class RyePay {
     return result.token;
   };
 
-  private async submitCart(token: string, paymentDetails: SpreedlyAdditionalFields) {
+  private async submitCart({ token, paymentDetails, applePayToken }: SubmitCartParams) {
     const input: CartApiSubmitInput = {
-      token,
+      token: token ?? 'apple_pay_token', // Token is still a required param even if method is ApplePay even though it is not used, so we set it to a dummy value. Will be changed in the future.
+      applePayToken,
       id: paymentDetails.metadata.cartId,
       billingAddress: {
         firstName: paymentDetails.first_name,
@@ -839,7 +906,7 @@ export class RyePay {
 
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
-      Authorization: await this.getAuthHeader(),
+      Authorization: await this.authService.getAuthHeader(),
     };
 
     if (paymentDetails.metadata.shopperIp) {
@@ -866,16 +933,6 @@ export class RyePay {
 
   private hasSpreedlyGlobal() {
     return !!(globalThis as any).Spreedly;
-  }
-
-  private async getAuthHeader() {
-    if (this.apiKey) {
-      return 'Basic ' + btoa(this.apiKey + ':');
-    }
-
-    const token = await this.generateJWT!();
-
-    return `Bearer ${token}`;
   }
 
   private log = (...args: any) => {
