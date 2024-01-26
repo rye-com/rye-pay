@@ -129,11 +129,11 @@ export class GooglePay {
    * the trigger that caused the callback.
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object or an empty object ({}) if none of the conditions are met.
    */
-  private async onPaymentDataChanged(
+  private onPaymentDataChanged = async (
     intermediatePaymentData: google.payments.api.IntermediatePaymentData
-  ): Promise<google.payments.api.PaymentDataRequestUpdate> {
+  ): Promise<google.payments.api.PaymentDataRequestUpdate> => {
     if (intermediatePaymentData.callbackTrigger === 'SHIPPING_OPTION') {
-      return await this.onShippingOptionChanged(intermediatePaymentData);
+      return this.onShippingOptionChanged(intermediatePaymentData);
     }
 
     if (
@@ -209,7 +209,7 @@ export class GooglePay {
       })
       .catch((error) => {
         // Handle any errors that occur during the payment process
-        this.log('Payment failed: ', error);
+        this.log('Payment failed: ', JSON.stringify(error));
       });
   }
 
@@ -221,9 +221,9 @@ export class GooglePay {
    * option, such as the ID of the option (`shippingOptionData?.id`).
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object.
    */
-  private async onShippingOptionChanged(
+  private onShippingOptionChanged = (
     intermediatePaymentData: google.payments.api.IntermediatePaymentData
-  ): Promise<google.payments.api.PaymentDataRequestUpdate> {
+  ): google.payments.api.PaymentDataRequestUpdate => {
     // Calculate new total price based on selected shipping option
     this.googlePayFinalPrice = this.googlePayShippingOptions.find(
       (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id
@@ -250,9 +250,9 @@ export class GooglePay {
    * payment data, including the shipping address selected by the user.
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object.
    */
-  private async onShippingAddressChanged(
+  private onShippingAddressChanged = async (
     intermediatePaymentData: google.payments.api.IntermediatePaymentData
-  ): Promise<google.payments.api.PaymentDataRequestUpdate> {
+  ): Promise<google.payments.api.PaymentDataRequestUpdate> => {
     // Update shipping options based on the selected address
     const updatedShippingOptions = await this.getGooglePayShippingOptions(
       intermediatePaymentData.shippingAddress!
@@ -307,7 +307,7 @@ export class GooglePay {
       ],
       transactionInfo: {
         totalPriceStatus: 'FINAL',
-        totalPrice: `${Number(this.cartSubtotal) / 100}`,
+        totalPrice: `${Number(this.cartSubtotal)}`,
         currencyCode: this.cartCurrency ?? 'USD',
       },
       shippingAddressRequired: true,
