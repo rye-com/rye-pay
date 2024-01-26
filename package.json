@@ -19,6 +19,7 @@
   "author": "RYE",
   "license": "ISC",
   "devDependencies": {
+    "@types/applepayjs": "^14.0.3",
     "@types/googlepay": "^0.7.5",
     "@types/node": "^18.14.4",
     "browserify": "^17.0.0",
@@ -29,7 +30,6 @@
     "dist/"
   ],
   "dependencies": {
-    "@types/applepayjs": "^14.0.3",
     "tsify": "^5.0.4"
   }
 }

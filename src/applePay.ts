@@ -1,6 +1,11 @@
 import { AuthService } from './authService';
 import { CartService } from './cartService';
 import {
+  APPLE_PAY_MERCHANT_IDENTIFIER,
+  APPLE_PAY_SCRIPT_URL,
+  APPLE_PAY_SERVER_URL,
+} from './constants';
+import {
   ApplePayInputParams,
   InitParams,
   SpreedlyAdditionalFields,
@@ -27,11 +32,6 @@ type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
 Pay, validating the merchant, selecting shipping options, selecting shipping methods, and
 authorizing payment. */
 export class ApplePay {
-  private readonly merchantIdentifier = 'merchant.app.ngrok.14e94dd56b77'; // TODO: change it to a production identifier
-  private readonly applePayServerUrl = 'https://apple-pay-server-ggymj6kjkq-uc.a.run.app';
-  private readonly applePayScriptUrl =
-    'https://applepay.cdn-apple.com/jsapi/v1.1.0/apple-pay-sdk.js';
-
   private cartApiEndpoint: string;
   private applePayInputParams: ApplePayInputParams;
   private updateBuyerIdentityMutation: string;
@@ -76,7 +76,7 @@ export class ApplePay {
 
         // Show the Apple Pay button
         const applePayScript = document.createElement('script');
-        applePayScript.src = this.applePayScriptUrl;
+        applePayScript.src = APPLE_PAY_SCRIPT_URL;
         document.head.appendChild(applePayScript);
         applePayScript.onload = () => {
           this.initializeApplePay();
@@ -92,24 +92,25 @@ export class ApplePay {
    * button if it does.
    */
   private initializeApplePay() {
-    if ((window as any).ApplePaySession) {
-      const promise = ApplePaySession.canMakePaymentsWithActiveCard(this.merchantIdentifier);
-      promise.then((canMakePayments) => {
-        if (canMakePayments) {
-          // Create Apple Pay button
-          const buttonContainer = document.getElementById('rye-apple-pay');
-          const button = document.createElement('apple-pay-button');
-          button.setAttribute('buttonstyle', 'black');
-          button.setAttribute('type', 'buy');
-          button.onclick = async () => await this.onApplePayClicked();
+    if ('ApplePaySession' in window) {
+      ApplePaySession.canMakePaymentsWithActiveCard(APPLE_PAY_MERCHANT_IDENTIFIER).then(
+        (canMakePayments) => {
+          if (canMakePayments) {
+            // Create Apple Pay button
+            const buttonContainer = document.getElementById('rye-apple-pay');
+            const button = document.createElement('apple-pay-button');
+            button.setAttribute('buttonstyle', 'black');
+            button.setAttribute('type', 'buy');
+            button.onclick = async () => await this.onApplePayClicked();
 
-          if (buttonContainer) {
-            buttonContainer.appendChild(button);
-          } else {
-            this.log('Apple Pay button container not found');
+            if (buttonContainer) {
+              buttonContainer.appendChild(button);
+            } else {
+              this.log('Apple Pay button container not found');
+            }
           }
         }
-      });
+      );
     }
   }
 
@@ -200,7 +201,7 @@ export class ApplePay {
    */
   private async onValidateMerchant(event: ApplePayJS.ApplePayValidateMerchantEvent) {
     try {
-      const result = await fetch(this.applePayServerUrl, {
+      const result = await fetch(APPLE_PAY_SERVER_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
