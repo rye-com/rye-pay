@@ -1,4 +1,5 @@
 import { AuthService } from './authService';
+import { PAYMENT_TYPE } from './constants';
 import {
   CartApiSubmitInput,
   GetCartResult,
@@ -25,6 +26,7 @@ export class CartService {
   private static instance: CartService;
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private readonly getCartQuery = `query ($id: ID!) { getCart(id: $id) { cart { id cost { subtotal { value currency } tax { value } shipping { value } total { value } } buyerIdentity { firstName lastName address1 address2 city provinceCode countryCode postalCode email phone } stores { ... on AmazonStore { errors { code message details { productIds } } store cartLines { quantity product { id } } offer { errors { code message details { ... on AmazonOfferErrorDetails { productIds } } } subtotal { value displayValue currency } margin { value displayValue currency } notAvailableIds shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { errors { code message details { variantIds } } store cartLines { quantity variant { id } } offer { errors { code message details { ... on ShopifyOfferErrorDetails { variantIds } } } subtotal { value displayValue currency } margin { value displayValue currency } notAvailableIds shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } errors { code message } } }`;
+  private readonly updateBuyerIdentityMutation = `mutation ($input: CartBuyerIdentityUpdateInput!) { updateCartBuyerIdentity(input: $input) { cart { id stores { ... on AmazonStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } } }`;
   private readonly authService: AuthService;
   private cartApiEndpoint;
 
@@ -82,6 +84,70 @@ export class CartService {
     };
 
     return result;
+  }
+
+  public async updateBuyerIdentity(
+    cartId: string,
+    shopperIp: string,
+    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
+    paymentType: PAYMENT_TYPE
+  ) {
+    const headers: RequestInit['headers'] = {
+      'Content-Type': 'application/json',
+      Authorization: await this.authService.getAuthHeader(),
+    };
+
+    headers[ryeShopperIpHeaderKey] = shopperIp;
+
+    let buyerIdentity: any = {
+      provinceCode: shippingAddress.administrativeArea ?? '',
+      countryCode: shippingAddress?.countryCode ?? '',
+      postalCode: shippingAddress?.postalCode ?? '',
+    };
+
+    if (paymentType === PAYMENT_TYPE.APPLE_PAY && 'givenName' in shippingAddress) {
+      // For Apple Pay
+      buyerIdentity = {
+        ...buyerIdentity,
+        firstName: shippingAddress.givenName ?? '',
+        lastName: shippingAddress.familyName ?? '',
+        phone: shippingAddress?.phoneNumber,
+        address1: shippingAddress?.addressLines?.at(0) ?? '',
+        address2: shippingAddress?.addressLines?.at(1) ?? '',
+        city: shippingAddress?.locality ?? '',
+      };
+    } else if (
+      paymentType === PAYMENT_TYPE.GOOGLE_PAY &&
+      (shippingAddress as google.payments.api.Address).name
+    ) {
+      // For Google Pay
+      const googleAddress = shippingAddress as google.payments.api.Address;
+      buyerIdentity = {
+        ...buyerIdentity,
+        firstName: googleAddress?.name?.split(' ')[0] ?? '',
+        lastName: googleAddress?.name?.split(' ')[1] ?? '',
+        phone: googleAddress?.phoneNumber,
+        address1: googleAddress?.address1 ?? '',
+        address2: googleAddress?.address2 ?? '',
+        city: googleAddress?.locality ?? '',
+      };
+    }
+
+    const rawResponse = await fetch(this.cartApiEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: this.updateBuyerIdentityMutation,
+        variables: {
+          input: {
+            id: cartId,
+            buyerIdentity: buyerIdentity,
+          },
+        },
+      }),
+    });
+
+    return await rawResponse.json();
   }
 
   /**
