@@ -882,7 +882,7 @@ export class RyePay {
 
   private async submitCart({ token, paymentDetails, applePayToken }: SubmitCartParams) {
     const input: CartApiSubmitInput = {
-      token: token ?? 'apple_pay_token',
+      token: token ?? 'apple_pay_token', // Token is still a required param even if method is ApplePay even though it is not used, so we set it to a dummy value. Will be changed in the future.
       applePayToken,
       id: paymentDetails.metadata.cartId,
       billingAddress: {
