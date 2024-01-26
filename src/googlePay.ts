@@ -145,7 +145,7 @@ export class GooglePay {
     }
 
     return {};
-  }
+  };
 
   /**
    * The `onGooglePayClicked` function handles the payment process using Google Pay, including
@@ -240,7 +240,7 @@ export class GooglePay {
         currencyCode: this.googlePayFinalCurrency ?? 'USD',
       },
     };
-  }
+  };
 
   /**
    * The `onShippingAddressChanged` function updates the shipping options and transaction information
@@ -278,7 +278,7 @@ export class GooglePay {
         currencyCode: 'USD',
       },
     };
-  }
+  };
 
   /**
    * The function returns a Google Pay payment data request object with specific parameters and
