@@ -115,82 +115,58 @@ export class ApplePay {
   }
 
   /**
-   * The function `updateAppleBuyerIdentity` updates the buyer's identity information for an Apple Pay
-   * transaction.
-   * @param shippingAddress - The `shippingAddress` parameter is an object of type
-   * `ApplePayPaymentContact` that contains information about the buyer's shipping address. It has the
-   * following properties:
-   * @returns the response from the API call as a JSON object.
+   * The function handles the process of initiating an Apple Pay session and performing various
+   * actions during the session, such as validating the merchant, selecting shipping options, selecting
+   * shipping methods, and authorizing payment.
+   * @returns: void
    */
-  private async updateAppleBuyerIdentity(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
-    const headers: RequestInit['headers'] = {
-      'Content-Type': 'application/json',
-      Authorization: await this.authService.getAuthHeader(),
-    };
-
-    headers[this.ryeShopperIpHeaderKey] = this.applePayInputParams.shopperIp;
-
-    let buyerIdentity: any = {
-      provinceCode: shippingAddress.administrativeArea ?? '',
-      countryCode: shippingAddress?.countryCode ?? '',
-      postalCode: shippingAddress?.postalCode ?? '',
-    };
-
-    if (shippingAddress.givenName) {
-      buyerIdentity = {
-        firstName: shippingAddress.givenName ?? '',
-        lastName: shippingAddress.familyName ?? '',
-        phone: shippingAddress?.phoneNumber,
-        address1: shippingAddress?.addressLines?.at(0) ?? '',
-        address2: shippingAddress?.addressLines?.at(1) ?? '',
-        city: shippingAddress?.locality ?? '',
-        provinceCode: shippingAddress?.administrativeArea ?? '',
-        countryCode: shippingAddress?.countryCode ?? '',
-        postalCode: shippingAddress?.postalCode ?? '',
-      };
+  private async onApplePayClicked() {
+    // Check for ApplePaySession availability
+    if (typeof ApplePaySession === 'undefined') {
+      this.log('Apple Pay is not available on this device/browser.');
+      return;
     }
+    // Define the Apple Pay payment request
+    const paymentRequest = {
+      countryCode: 'US',
+      currencyCode: this.cartCurrency,
+      supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+      merchantCapabilities: ['supports3DS'] as ApplePayJS.ApplePayMerchantCapability[],
+      total: {
+        label: this.applePayInputParams.merchantDisplayName ?? '',
+        amount: `${this.cartSubtotal}`,
+      },
+      requiredShippingContactFields: [
+        'email',
+        'name',
+        'phone',
+        'postalAddress',
+      ] as ApplePayJS.ApplePayContactField[],
+      shippingMethods: [],
+    };
 
-    const rawResponse = await fetch(this.cartApiEndpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        query: this.updateBuyerIdentityMutation,
-        variables: {
-          input: {
-            id: this.applePayInputParams.cartId,
-            buyerIdentity: buyerIdentity,
-          },
-        },
-      }),
-    });
+    // Create an ApplePaySession
+    this.applePaySession = new ApplePaySession(3, paymentRequest);
 
-    return await rawResponse.json();
-  }
+    // Validate merchant
+    this.applePaySession.onvalidatemerchant = (event) => this.onValidateMerchant(event);
 
-  /**
-   * The function `getAppleShippingOptions` retrieves shipping options for an Apple Pay transaction
-   * based on the provided shipping address.
-   * @param shippingAddress - The `shippingAddress` parameter is of type
-   * `ApplePayJS.ApplePayPaymentContact` and represents the shipping address provided by the user
-   * during the Apple Pay checkout process.
-   * @returns an array of shipping options. Each shipping option is an object with properties such as
-   * identifier, label, detail, amount, and total.
-   */
-  private async getAppleShippingOptions(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
-    const content = await this.updateAppleBuyerIdentity(shippingAddress);
-    const shippingOptions =
-      content?.data?.updateCartBuyerIdentity?.cart?.stores
-        ?.at(0)
-        ?.offer?.shippingMethods?.map((shippingMethod: any) => ({
-          identifier: shippingMethod.id,
-          label: shippingMethod.label,
-          detail: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
-          amount: Number(shippingMethod.price.value) / 100,
-          total: {
-            amount: Number(shippingMethod.total.value) / 100,
-          },
-        })) ?? [];
-    return shippingOptions;
+    // Fetch shipping options when shipping contact is selected or changed
+    this.applePaySession.onshippingcontactselected = (event) =>
+      this.onShippingContactSelected(event);
+
+    // Update shipping method when shipping method is selected or changed
+    this.applePaySession.onshippingmethodselected = (event) => this.onShippingMethodSelected(event);
+
+    // Authorize payment
+    this.applePaySession.onpaymentauthorized = (event) => this.onPaymentAuthorized(event);
+
+    // Start the Apple Pay session
+    try {
+      this.applePaySession.begin();
+    } catch (error) {
+      this.log('Apple Pay session failed:', error);
+    }
   }
 
   /**
@@ -330,57 +306,81 @@ export class ApplePay {
   }
 
   /**
-   * The function handles the process of initiating an Apple Pay session and performing various
-   * actions during the session, such as validating the merchant, selecting shipping options, selecting
-   * shipping methods, and authorizing payment.
-   * @returns nothing (undefined).
+   * The function `updateAppleBuyerIdentity` updates the buyer's identity information for an Apple Pay
+   * transaction.
+   * @param shippingAddress - The `shippingAddress` parameter is an object of type
+   * `ApplePayPaymentContact` that contains information about the buyer's shipping address. It has the
+   * following properties:
+   * @returns the response from the API call as a JSON object.
    */
-  private async onApplePayClicked() {
-    // Check for ApplePaySession availability
-    if (typeof ApplePaySession === 'undefined') {
-      this.log('Apple Pay is not available on this device/browser.');
-      return;
-    }
-    // Define the Apple Pay payment request
-    const paymentRequest = {
-      countryCode: 'US',
-      currencyCode: this.cartCurrency,
-      supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
-      merchantCapabilities: ['supports3DS'] as ApplePayJS.ApplePayMerchantCapability[],
-      total: {
-        label: this.applePayInputParams.merchantDisplayName ?? '',
-        amount: `${this.cartSubtotal}`,
-      },
-      requiredShippingContactFields: [
-        'email',
-        'name',
-        'phone',
-        'postalAddress',
-      ] as ApplePayJS.ApplePayContactField[],
-      shippingMethods: [],
+  private async updateAppleBuyerIdentity(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
+    const headers: RequestInit['headers'] = {
+      'Content-Type': 'application/json',
+      Authorization: await this.authService.getAuthHeader(),
     };
 
-    // Create an ApplePaySession
-    this.applePaySession = new ApplePaySession(3, paymentRequest);
+    headers[this.ryeShopperIpHeaderKey] = this.applePayInputParams.shopperIp;
 
-    // Validate merchant
-    this.applePaySession.onvalidatemerchant = (event) => this.onValidateMerchant(event);
+    let buyerIdentity: any = {
+      provinceCode: shippingAddress.administrativeArea ?? '',
+      countryCode: shippingAddress?.countryCode ?? '',
+      postalCode: shippingAddress?.postalCode ?? '',
+    };
 
-    // Fetch shipping options when shipping contact is selected or changed
-    this.applePaySession.onshippingcontactselected = (event) =>
-      this.onShippingContactSelected(event);
-
-    // Update shipping method when shipping method is selected or changed
-    this.applePaySession.onshippingmethodselected = (event) => this.onShippingMethodSelected(event);
-
-    // Authorize payment
-    this.applePaySession.onpaymentauthorized = (event) => this.onPaymentAuthorized(event);
-
-    // Start the Apple Pay session
-    try {
-      this.applePaySession.begin();
-    } catch (error) {
-      this.log('Apple Pay session failed:', error);
+    if (shippingAddress.givenName) {
+      buyerIdentity = {
+        firstName: shippingAddress.givenName ?? '',
+        lastName: shippingAddress.familyName ?? '',
+        phone: shippingAddress?.phoneNumber,
+        address1: shippingAddress?.addressLines?.at(0) ?? '',
+        address2: shippingAddress?.addressLines?.at(1) ?? '',
+        city: shippingAddress?.locality ?? '',
+        provinceCode: shippingAddress?.administrativeArea ?? '',
+        countryCode: shippingAddress?.countryCode ?? '',
+        postalCode: shippingAddress?.postalCode ?? '',
+      };
     }
+
+    const rawResponse = await fetch(this.cartApiEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: this.updateBuyerIdentityMutation,
+        variables: {
+          input: {
+            id: this.applePayInputParams.cartId,
+            buyerIdentity: buyerIdentity,
+          },
+        },
+      }),
+    });
+
+    return await rawResponse.json();
+  }
+
+  /**
+   * The function `getAppleShippingOptions` retrieves shipping options for an Apple Pay transaction
+   * based on the provided shipping address.
+   * @param shippingAddress - The `shippingAddress` parameter is of type
+   * `ApplePayJS.ApplePayPaymentContact` and represents the shipping address provided by the user
+   * during the Apple Pay checkout process.
+   * @returns an array of shipping options. Each shipping option is an object with properties such as
+   * identifier, label, detail, amount, and total.
+   */
+  private async getAppleShippingOptions(shippingAddress: ApplePayJS.ApplePayPaymentContact) {
+    const content = await this.updateAppleBuyerIdentity(shippingAddress);
+    const shippingOptions =
+      content?.data?.updateCartBuyerIdentity?.cart?.stores
+        ?.at(0)
+        ?.offer?.shippingMethods?.map((shippingMethod: any) => ({
+          identifier: shippingMethod.id,
+          label: shippingMethod.label,
+          detail: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
+          amount: Number(shippingMethod.price.value) / 100,
+          total: {
+            amount: Number(shippingMethod.total.value) / 100,
+          },
+        })) ?? [];
+    return shippingOptions;
   }
 }
