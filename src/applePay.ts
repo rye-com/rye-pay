@@ -221,7 +221,7 @@ export class ApplePay {
       ApplePaySession.STATUS_SUCCESS,
       this.shippingOptions,
       newTotal,
-      []
+      [] // Apple Pay Line items to display on the pay sheet
     );
   }
 
@@ -252,7 +252,7 @@ export class ApplePay {
     this.applePaySession?.completeShippingMethodSelection(
       ApplePaySession.STATUS_SUCCESS,
       newTotal,
-      []
+      [] // Apple Pay Line items to display on the pay sheet
     );
   }
 
