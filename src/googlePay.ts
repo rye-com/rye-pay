@@ -78,7 +78,7 @@ export class GooglePay {
       },
     });
     const button = paymentsClient.createButton({
-      onClick: () => this.onGooglePayClicked(paymentsClient),
+      onClick: async () => await this.onGooglePayClicked(paymentsClient),
     });
 
     const buttonContainer = document.getElementById('rye-google-pay');
@@ -156,61 +156,61 @@ export class GooglePay {
    * perform payment-related operations, such as loading payment data and initiating payment
    * transactions.
    */
-  private onGooglePayClicked(paymentsClient: google.payments.api.PaymentsClient) {
-    paymentsClient
-      .loadPaymentData(this.getGooglePayPaymentDataRequest())
-      .then(async (paymentData) => {
-        // Extract payment token from paymentData
-        const paymentToken = paymentData.paymentMethodData.tokenizationData.token;
-        const shippingAddress = paymentData.shippingAddress;
+  private async onGooglePayClicked(paymentsClient: google.payments.api.PaymentsClient) {
+    try {
+      const paymentData = await paymentsClient.loadPaymentData(
+        this.getGooglePayPaymentDataRequest()
+      );
+      // Extract payment token from paymentData
+      const paymentToken = paymentData.paymentMethodData.tokenizationData.token;
+      const shippingAddress = paymentData.shippingAddress;
 
-        // Update buyer identity with the complete shipping address
-        const updateBuyerIdentity = await this.cartService.updateBuyerIdentity(
-          this.googlePayInputParams.cartId,
-          this.googlePayInputParams.shopperIp,
-          shippingAddress!,
-          PAYMENT_TYPE.GOOGLE_PAY
-        );
+      // Update buyer identity with the complete shipping address
+      const updateBuyerIdentity = await this.cartService.updateBuyerIdentity(
+        this.googlePayInputParams.cartId,
+        this.googlePayInputParams.shopperIp,
+        shippingAddress!,
+        PAYMENT_TYPE.GOOGLE_PAY
+      );
 
-        // Get the selected shipping option
-        const selectedShippingOptionId = paymentData.shippingOptionData?.id;
-        const selectedShippingOptions =
-          updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
-            const option = store.offer.shippingMethods.find(
-              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
-            );
-            return {
-              store: store.store,
-              shippingId: option.id,
-            };
-          });
+      // Get the selected shipping option
+      const selectedShippingOptionId = paymentData.shippingOptionData?.id;
+      const selectedShippingOptions =
+        updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
+          const option = store.offer.shippingMethods.find(
+            (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+          );
+          return {
+            store: store.store,
+            shippingId: option.id,
+          };
+        });
 
-        const paymentDetails: SpreedlyAdditionalFields = {
-          first_name: shippingAddress?.name?.split(' ')[0] ?? '',
-          last_name: shippingAddress?.name?.split(' ')[1] ?? '',
-          phone_number: shippingAddress?.phoneNumber,
-          month: '', // Empty values for month because Google Pay does not provide this information
-          year: '', // Empty values for year because Google Pay does not provide this information
-          address1: shippingAddress?.address1 ?? '',
-          address2: shippingAddress?.address2 ?? '',
-          city: shippingAddress?.locality ?? '',
-          state: shippingAddress?.administrativeArea ?? '',
-          zip: shippingAddress?.postalCode ?? '',
-          country: shippingAddress?.countryCode ?? '',
-          metadata: {
-            cartId: this.googlePayInputParams.cartId,
-            selectedShippingOptions: JSON.stringify(selectedShippingOptions),
-            shopperIp: this.googlePayInputParams.shopperIp,
-          },
-        };
+      const paymentDetails: SpreedlyAdditionalFields = {
+        first_name: shippingAddress?.name?.split(' ')[0] ?? '',
+        last_name: shippingAddress?.name?.split(' ')[1] ?? '',
+        phone_number: shippingAddress?.phoneNumber,
+        month: '', // Empty values for month because Google Pay does not provide this information
+        year: '', // Empty values for year because Google Pay does not provide this information
+        address1: shippingAddress?.address1 ?? '',
+        address2: shippingAddress?.address2 ?? '',
+        city: shippingAddress?.locality ?? '',
+        state: shippingAddress?.administrativeArea ?? '',
+        zip: shippingAddress?.postalCode ?? '',
+        country: shippingAddress?.countryCode ?? '',
+        metadata: {
+          cartId: this.googlePayInputParams.cartId,
+          selectedShippingOptions: JSON.stringify(selectedShippingOptions),
+          shopperIp: this.googlePayInputParams.shopperIp,
+        },
+      };
 
-        const result = await this.cartService.submitCart({ token: paymentToken, paymentDetails });
-        this.onCartSubmitted?.(result.submitCart, result.errors);
-      })
-      .catch((error) => {
-        // Handle any errors that occur during the payment process
-        this.log('Payment failed: ', JSON.stringify(error));
-      });
+      const result = await this.cartService.submitCart({ token: paymentToken, paymentDetails });
+      this.onCartSubmitted?.(result.submitCart, result.errors);
+    } catch (error) {
+      // Handle any errors that occur during the payment process
+      this.log('Payment failed: ', JSON.stringify(error));
+    }
   }
 
   /**

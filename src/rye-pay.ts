@@ -304,7 +304,7 @@ const prodCartApiEndpoint =
   process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
-const localCartApiEndpoint = 'http://localhost:3000/v1/query';
+const localCartApiEndpoint = 'https://2997c85f5fe1.ngrok.app/v1/query';
 export const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 export const cartSubmitResponse = `
