@@ -9,6 +9,7 @@ import {
   cartSubmitResponse,
   ryeShopperIpHeaderKey,
 } from './rye-pay';
+import { isApplePayAddress, isGooglePayAddress } from './utils';
 
 type SubmitCartMutationResult = {
   submitCart: SubmitCartResult;
@@ -121,7 +122,7 @@ export class CartService {
       postalCode: shippingAddress?.postalCode ?? '',
     };
 
-    if (paymentType === PAYMENT_TYPE.APPLE_PAY && 'givenName' in shippingAddress) {
+    if (isApplePayAddress(shippingAddress)) {
       // For Apple Pay
       buyerIdentity = {
         ...buyerIdentity,
@@ -132,10 +133,7 @@ export class CartService {
         address2: shippingAddress?.addressLines?.at(1) ?? '',
         city: shippingAddress?.locality ?? '',
       };
-    } else if (
-      paymentType === PAYMENT_TYPE.GOOGLE_PAY &&
-      (shippingAddress as google.payments.api.Address).name
-    ) {
+    } else if (isGooglePayAddress(shippingAddress)) {
       // For Google Pay
       const googleAddress = shippingAddress as google.payments.api.Address;
       buyerIdentity = {
