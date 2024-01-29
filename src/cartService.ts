@@ -1,5 +1,4 @@
 import { AuthService } from './authService';
-import { PAYMENT_TYPE } from './constants';
 import {
   CartApiSubmitInput,
   GetCartResult,
@@ -98,16 +97,12 @@ export class CartService {
    * `shippingAddress` parameter is an object that represents the shipping address of the buyer. It can
    * be either a `google.payments.api.Address` object or an `ApplePayJS.ApplePayPaymentContact` object,
    * depending on the payment type.
-   * @param {PAYMENT_TYPE} paymentType - The `paymentType` parameter is a variable of type
-   * `PAYMENT_TYPE`. It is used to determine the type of payment being used, either `APPLE_PAY` or
-   * `GOOGLE_PAY`.
    * @returns the response from the API call as a JSON object.
    */
   public async updateBuyerIdentity(
     cartId: string,
     shopperIp: string,
-    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
-    paymentType: PAYMENT_TYPE
+    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact
   ) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',

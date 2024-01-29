@@ -3,8 +3,7 @@ import {
   APPLE_PAY_MERCHANT_IDENTIFIER,
   APPLE_PAY_SCRIPT_URL,
   APPLE_PAY_SERVER_URL,
-  APPLE_PAY_VERSION,
-  PAYMENT_TYPE,
+  APPLE_PAY_VERSION
 } from './constants';
 import {
   ApplePayInputParams,
@@ -253,8 +252,7 @@ export class ApplePay {
     const updateBuyerIdentity = await this.cartService.updateBuyerIdentity(
       this.applePayInputParams.cartId,
       this.applePayInputParams.shopperIp,
-      shippingAddress!,
-      PAYMENT_TYPE.APPLE_PAY
+      shippingAddress!
     );
     const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
 
@@ -313,8 +311,7 @@ export class ApplePay {
     const content = await this.cartService.updateBuyerIdentity(
       this.applePayInputParams.cartId,
       this.applePayInputParams.shopperIp,
-      shippingAddress,
-      PAYMENT_TYPE.APPLE_PAY
+      shippingAddress
     );
     const shippingOptions =
       content?.data?.updateCartBuyerIdentity?.cart?.stores

@@ -1,5 +1,5 @@
 import { CartService } from './cartService';
-import { GOOGLE_PAY_SCRIPT_URL, PAYMENT_TYPE } from './constants';
+import { GOOGLE_PAY_SCRIPT_URL } from './constants';
 import { GooglePayInputParams, InitParams, SpreedlyAdditionalFields } from './rye-pay';
 import { ShippingMethod } from './types';
 
@@ -102,8 +102,7 @@ export class GooglePay {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
       this.googlePayInputParams.shopperIp,
-      shippingAddress!,
-      PAYMENT_TYPE.GOOGLE_PAY
+      shippingAddress!
     );
 
     return (
@@ -169,8 +168,7 @@ export class GooglePay {
       const updateBuyerIdentity = await this.cartService.updateBuyerIdentity(
         this.googlePayInputParams.cartId,
         this.googlePayInputParams.shopperIp,
-        shippingAddress!,
-        PAYMENT_TYPE.GOOGLE_PAY
+        shippingAddress!
       );
 
       // Get the selected shipping option
