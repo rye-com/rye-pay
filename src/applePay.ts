@@ -3,7 +3,7 @@ import {
   APPLE_PAY_MERCHANT_IDENTIFIER,
   APPLE_PAY_SCRIPT_URL,
   APPLE_PAY_SERVER_URL,
-  APPLE_PAY_VERSION
+  APPLE_PAY_VERSION,
 } from './constants';
 import {
   ApplePayInputParams,
