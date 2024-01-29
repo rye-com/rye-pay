@@ -117,7 +117,7 @@ export class CartService {
       postalCode: shippingAddress?.postalCode ?? '',
     };
 
-    if (isApplePayAddress(shippingAddress)) {
+    if (isApplePayAddress(shippingAddress) && shippingAddress.givenName) {
       // For Apple Pay
       buyerIdentity = {
         ...buyerIdentity,
@@ -128,17 +128,16 @@ export class CartService {
         address2: shippingAddress?.addressLines?.at(1) ?? '',
         city: shippingAddress?.locality ?? '',
       };
-    } else if (isGooglePayAddress(shippingAddress)) {
+    } else if (isGooglePayAddress(shippingAddress) && shippingAddress.name) {
       // For Google Pay
-      const googleAddress = shippingAddress as google.payments.api.Address;
       buyerIdentity = {
         ...buyerIdentity,
-        firstName: googleAddress?.name?.split(' ')[0] ?? '',
-        lastName: googleAddress?.name?.split(' ')[1] ?? '',
-        phone: googleAddress?.phoneNumber,
-        address1: googleAddress?.address1 ?? '',
-        address2: googleAddress?.address2 ?? '',
-        city: googleAddress?.locality ?? '',
+        firstName: shippingAddress?.name?.split(' ')[0] ?? '',
+        lastName: shippingAddress?.name?.split(' ')[1] ?? '',
+        phone: shippingAddress?.phoneNumber,
+        address1: shippingAddress?.address1 ?? '',
+        address2: shippingAddress?.address2 ?? '',
+        city: shippingAddress?.locality ?? '',
       };
     }
 

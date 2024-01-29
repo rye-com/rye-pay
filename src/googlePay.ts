@@ -43,33 +43,35 @@ export class GooglePay {
   /**
    * The function loads the Google Pay script and initializes Google Pay after fetching the cart cost.
    */
-  loadGooglePay() {
-    this.cartService
-      .getCart(this.googlePayInputParams.cartId, this.googlePayInputParams.shopperIp)
-      .then((result) => {
-        this.cartSubtotal = Number(result.cart.cost.subtotal.value) / 100;
-        this.cartCurrency = result.cart.cost.subtotal.currency;
+  loadGooglePay = async () => {
+    try {
+      const getCartResponse = await this.cartService.getCart(
+        this.googlePayInputParams.cartId,
+        this.googlePayInputParams.shopperIp
+      );
 
-        // Show the Apple Pay button
-        const googlePayScript = document.createElement('script');
-        googlePayScript.src = GOOGLE_PAY_SCRIPT_URL;
-        googlePayScript.async = true;
-        document.head.appendChild(googlePayScript);
+      this.cartSubtotal = Number(getCartResponse.cart.cost.subtotal.value) / 100;
+      this.cartCurrency = getCartResponse.cart.cost.subtotal.currency;
 
-        googlePayScript.onload = () => {
-          this.initializeGooglePay();
-        };
-      })
-      .catch((error) => {
-        this.log(`Error fetching cart cost: ${error}`);
-      });
-  }
+      // Show the Apple Pay button
+      const googlePayScript = document.createElement('script');
+      googlePayScript.src = GOOGLE_PAY_SCRIPT_URL;
+      googlePayScript.async = true;
+      document.head.appendChild(googlePayScript);
+
+      googlePayScript.onload = () => {
+        this.initializeGooglePay();
+      };
+    } catch (error) {
+      this.log(`Error fetching cart cost: ${error}`);
+    }
+  };
 
   /**
    * The function initializes the Google Pay API by creating a PaymentsClient and a button, and then
    * appends the button to a specified container element.
    */
-  private initializeGooglePay() {
+  private initializeGooglePay = () => {
     const paymentsClient = new google.payments.api.PaymentsClient({
       environment: 'TEST', // TODO: needs to be updated to production when approval is granted
       paymentDataCallbacks: {
@@ -88,7 +90,7 @@ export class GooglePay {
     } else {
       this.log('Google Pay button container not found');
     }
-  }
+  };
 
   /**
    * The function `getGooglePayShippingOptions` retrieves shipping options for Google Pay based on the
@@ -98,7 +100,7 @@ export class GooglePay {
    * @returns an array of shipping options. Each shipping option has the following properties: id,
    * label, description, finalValue, and currency.
    */
-  private async getGooglePayShippingOptions(shippingAddress: google.payments.api.Address) {
+  private getGooglePayShippingOptions = async (shippingAddress: google.payments.api.Address) => {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
       this.googlePayInputParams.shopperIp,
@@ -118,7 +120,7 @@ export class GooglePay {
           currency: shippingMethod.total.currency ?? 'USD',
         })) ?? []
     );
-  }
+  };
 
   /**
    * The function `onPaymentDataChanged` handles different callback triggers and performs specific
@@ -155,7 +157,7 @@ export class GooglePay {
    * perform payment-related operations, such as loading payment data and initiating payment
    * transactions.
    */
-  private async onGooglePayClicked(paymentsClient: google.payments.api.PaymentsClient) {
+  private onGooglePayClicked = async (paymentsClient: google.payments.api.PaymentsClient) => {
     try {
       const paymentData = await paymentsClient.loadPaymentData(
         this.getGooglePayPaymentDataRequest()
@@ -165,7 +167,7 @@ export class GooglePay {
       const shippingAddress = paymentData.shippingAddress;
 
       // Update buyer identity with the complete shipping address
-      const updateBuyerIdentity = await this.cartService.updateBuyerIdentity(
+      const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
         this.googlePayInputParams.cartId,
         this.googlePayInputParams.shopperIp,
         shippingAddress!
@@ -174,7 +176,7 @@ export class GooglePay {
       // Get the selected shipping option
       const selectedShippingOptionId = paymentData.shippingOptionData?.id;
       const selectedShippingOptions =
-        updateBuyerIdentity.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
+        updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
           const option = store.offer.shippingMethods.find(
             (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
           );
@@ -209,7 +211,7 @@ export class GooglePay {
       // Handle any errors that occur during the payment process
       this.log('Payment failed: ', JSON.stringify(error));
     }
-  }
+  };
 
   /**
    * The function calculates the new total price based on the selected shipping option and returns an
@@ -283,7 +285,7 @@ export class GooglePay {
    * configurations.
    * @returns {google.payments.api.PaymentDataRequest}
    */
-  private getGooglePayPaymentDataRequest(): google.payments.api.PaymentDataRequest {
+  private getGooglePayPaymentDataRequest = (): google.payments.api.PaymentDataRequest => {
     return {
       apiVersion: 2,
       apiVersionMinor: 0,
@@ -318,5 +320,5 @@ export class GooglePay {
       },
       callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION'],
     };
-  }
+  };
 }
