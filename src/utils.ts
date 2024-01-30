@@ -19,7 +19,7 @@ export function isGooglePayAddress(
 This function is required for Canada and UK for Apple Pay and Google Pay.
 
 Reason:
-When the Apple/Google Pay sheet is loading, the payment sheet has access to a redacted postal code (the first three digits).
+When the Apple/Google Pay sheet is loading, the payment sheet has access to a redacted postal code for UK and Canada (the first three digits).
 For Canada -> It has access to only the forward sortation area (FSA) of the postal code (the first three letters).
 For UK -> It has access to only the outward code of the postal code (the first half of the postal code).
 To get Shipping options, the full postal code is required.
