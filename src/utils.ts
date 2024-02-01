@@ -1,4 +1,4 @@
-import Papa from 'papaparse';
+import canadaPostalCodes from './canadaPostalCodes.json';
 
 const POSTAL_CODE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // List of possible letters in Canada / UK postal codes
 const POSTAL_CODE_DIGITS = '0123456789'; // List of possible digits in Canada / UK postal codes
@@ -46,38 +46,6 @@ function getRandomChar(str: string): string {
 }
 
 /**
- * The function `findFirstZipCode` takes a URL and a prefix as input, downloads a CSV file from the
- * URL, and returns the first zip code in the file that starts with the given prefix, or null if no
- * matching zip code is found.
- * @param {string} url - The `url` parameter is a string that represents the URL from which the zip
- * code data will be fetched. This URL should point to a CSV file that contains the zip code data.
- * @param {string} prefix - The `prefix` parameter is a string that represents the desired prefix of
- * the zip code. The function will search for the first zip code in the data that starts with this
- * prefix.
- * @returns The function `findFirstZipCode` returns a `Promise` that resolves to a `string` if a
- * matching zip code is found, or `null` if no matching zip code is found.
- */
-async function findFirstZipCode(url: string, prefix: string): Promise<string | null> {
-  return new Promise((resolve, reject) => {
-    Papa.parse(url, {
-      download: true,
-      complete: (results) => {
-        const data = results.data as string[][];
-        for (const row of data) {
-          const zipCode = row[0];
-          if (zipCode && zipCode.startsWith(prefix)) {
-            resolve(zipCode);
-            return;
-          }
-        }
-        resolve(null); // No matching zip code found
-      },
-      error: (error) => reject(error),
-    });
-  });
-}
-
-/**
  * The function `getFullPostalCodeForUK` retrieves the full postal code for a given partial postal code
  * in the UK, using the Postcodes.io API, and returns a fallback postal code if the API call fails.
  * @param {string} postalCode - The `postalCode` parameter is a string representing a partial postal code in the UK.
@@ -85,39 +53,58 @@ async function findFirstZipCode(url: string, prefix: string): Promise<string | n
  */
 async function getFullPostalCodeForUK(postalCode: string): Promise<string> {
   const postalCodeUrl = `https://api.postcodes.io/postcodes/${postalCode}/autocomplete`;
-  const sector = getRandomChar(POSTAL_CODE_DIGITS);
-  const unit = getRandomChar(POSTAL_CODE_LETTERS) + getRandomChar(POSTAL_CODE_LETTERS);
-  const fallbackPostalCode = postalCode + ' ' + sector + unit;
-
   try {
     const rawResponse = await fetch(postalCodeUrl, {
       method: 'GET',
     });
     const validPostalCodes = await rawResponse.json();
-    return validPostalCodes.result[0] ?? fallbackPostalCode;
+    return validPostalCodes.result[0] ?? generateFallbackPostalCodeForUK(postalCode);
   } catch (error) {
-    return fallbackPostalCode;
+    return generateFallbackPostalCodeForUK(postalCode);
   }
 }
 
 /**
- * The function `getFullPostalCodeForCanada` retrieves the full postal code for a given postal code in
- * Canada, using a CSV file of Canadian postal codes.
- * @param {string} postalCode - The `postalCode` parameter is a string representing a partial postal code for Canada.
- * @returns a Promise that resolves to a complete postal code string.
+ * The function `getFullPostalCodeForCanada` retrieves the full postal code for a given partial postal code
+ * in Canada, using a JSON object containing Canadian postal codes, and returns a fallback postal code if
+ * the JSON object does not contain the partial postal code.
+ * @param {string} postalCode - The `postalCode` parameter is a string representing a partial postal code in Canada.
+ * @returns complete postal code string.
  */
-async function getFullPostalCodeForCanada(postalCode: string): Promise<string> {
-  const canadianPostalCodesCsv =
-    'https://raw.githubusercontent.com/ccnixon/postalcodes/master/CanadianPostalCodes.csv';
+function getFullPostalCodeForCanada(postalCode: string): string {
+  try {
+    const fullPostalCode = (
+      canadaPostalCodes as {
+        [key: string]: string;
+      }
+    )[postalCode];
+
+    return fullPostalCode ?? generateFallbackPostalCodeForCanada(postalCode);
+  } catch (error) {
+    return generateFallbackPostalCodeForCanada(postalCode);
+  }
+}
+
+/**
+ * Generates a fallback postal code by appending a randomly generated sector and unit to the given partial postal code.
+ * @param {string} postalCode - The partial postal code to which the sector and unit will be appended.
+ * @returns {string} - The complete fallback postal code.
+ */
+function generateFallbackPostalCodeForUK(postalCode: string): string {
+  const sector = getRandomChar(POSTAL_CODE_DIGITS);
+  const unit = getRandomChar(POSTAL_CODE_LETTERS) + getRandomChar(POSTAL_CODE_LETTERS);
+  return postalCode + ' ' + sector + unit;
+}
+
+/**
+ * Generates a fallback postal code by appending a randomly generated LDU to the given partial postal code.
+ * @param {string} postalCode - The partial postal code to which the LDU will be appended.
+ * @returns {string} - The complete fallback postal code.
+ */
+function generateFallbackPostalCodeForCanada(postalCode: string): string {
   const ldu =
     getRandomChar(POSTAL_CODE_LETTERS) +
     getRandomChar(POSTAL_CODE_DIGITS) +
     getRandomChar(POSTAL_CODE_LETTERS); // Local Delivery Unit
-  const fallbackPostalCode = postalCode + ' ' + ldu;
-  try {
-    const fullPostalCode = await findFirstZipCode(canadianPostalCodesCsv, postalCode);
-    return fullPostalCode ?? fallbackPostalCode;
-  } catch (error) {
-    return fallbackPostalCode;
-  }
+  return postalCode + ' ' + ldu;
 }
