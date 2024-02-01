@@ -1,6 +1,7 @@
 export type RyeStore = {
   store: string;
   offer: {
+    selectedShippingMethod: ShippingMethod;
     shippingMethods: ShippingMethod[];
   };
 };

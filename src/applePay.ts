@@ -41,6 +41,8 @@ export class ApplePay {
   private cartService: CartService;
   private cartSubtotal: number | undefined;
   private cartCurrency: string = 'USD';
+  private cartHasMultipleStores: boolean = false;
+  private cartShippingMethods: ShippingMethod[] = [];
 
   constructor({ cartApiEndpoint, applePayInputParams, onCartSubmitted, log }: ApplePayParams) {
     this.cartApiEndpoint = cartApiEndpoint;
@@ -63,14 +65,25 @@ export class ApplePay {
 
       this.cartSubtotal = Number(getCartResponse.cart.cost.subtotal.value) / 100;
       this.cartCurrency = getCartResponse.cart.cost.subtotal.currency;
+      this.cartHasMultipleStores = getCartResponse.cart.stores.length > 1;
+      const storeWithoutShippingMethod =
+        getCartResponse.cart.stores.find(
+          (store: RyeStore) => !store.offer.selectedShippingMethod
+        ) ?? null;
 
-      // Show the Apple Pay button
-      const applePayScript = document.createElement('script');
-      applePayScript.src = APPLE_PAY_SCRIPT_URL;
-      document.head.appendChild(applePayScript);
-      applePayScript.onload = () => {
-        this.initializeApplePay();
-      };
+      if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
+        this.log(
+          'Shipping methods need to be selected for all stores in cart to display Apple Pay button.'
+        );
+      } else {
+        // Show the Apple Pay button
+        const applePayScript = document.createElement('script');
+        applePayScript.src = APPLE_PAY_SCRIPT_URL;
+        document.head.appendChild(applePayScript);
+        applePayScript.onload = () => {
+          this.initializeApplePay();
+        };
+      }
     } catch (error) {
       this.log(`Error fetching cart cost: ${error}`);
     }
@@ -117,12 +130,10 @@ export class ApplePay {
     }
     // Define the Apple Pay payment request
     const merchantCapabilities: ApplePayJS.ApplePayMerchantCapability[] = ['supports3DS'];
-    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = [
-      'email',
-      'name',
-      'phone',
-      'postalAddress',
-    ];
+    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = this
+      .cartHasMultipleStores
+      ? []
+      : ['email', 'name', 'phone', 'postalAddress'];
     const paymentRequest: ApplePayJS.ApplePayPaymentRequest = {
       countryCode: 'US',
       currencyCode: this.cartCurrency,
@@ -142,12 +153,15 @@ export class ApplePay {
     // Validate merchant
     this.applePaySession.onvalidatemerchant = (event) => this.onValidateMerchant(event);
 
-    // Fetch shipping options when shipping contact is selected or changed
-    this.applePaySession.onshippingcontactselected = (event) =>
-      this.onShippingContactSelected(event);
+    if (!this.cartHasMultipleStores) {
+      // Fetch shipping options when shipping contact is selected or changed
+      this.applePaySession.onshippingcontactselected = (event) =>
+        this.onShippingContactSelected(event);
 
-    // Update shipping method when shipping method is selected or changed
-    this.applePaySession.onshippingmethodselected = (event) => this.onShippingMethodSelected(event);
+      // Update shipping method when shipping method is selected or changed
+      this.applePaySession.onshippingmethodselected = (event) =>
+        this.onShippingMethodSelected(event);
+    }
 
     // Authorize payment
     this.applePaySession.onpaymentauthorized = (event) => this.onPaymentAuthorized(event);
@@ -252,43 +266,51 @@ export class ApplePay {
    * represents the event that is triggered when the payment is authorized in Apple Pay.
    */
   private onPaymentAuthorized = async (event: ApplePayJS.ApplePayPaymentAuthorizedEvent) => {
-    const shippingAddress = event.payment.shippingContact;
-    const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
-      this.applePayInputParams.cartId,
-      this.applePayInputParams.shopperIp,
-      shippingAddress!
-    );
-    const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
+    const address = event.payment.billingContact ?? event.payment.shippingContact;
+    let selectedShippingOptions = [];
 
-    const selectedShippingOptions =
-      updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map(
-        (store: RyeStore) => {
-          const option = store.offer.shippingMethods.find(
-            (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId
-          );
-          return {
-            store: store.store,
-            shippingId: option?.id,
-          };
-        }
+    // BuyerIdentity for cart is only required if the cart has multiple stores.
+    // If cart has multiple stores, all shipping options must have already been selected, no reason to update buyer identity again.
+    if (!this.cartHasMultipleStores) {
+      const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
+        this.applePayInputParams.cartId,
+        this.applePayInputParams.shopperIp,
+        event.payment.shippingContact!
       );
+      const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
+
+      selectedShippingOptions =
+        updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map(
+          (store: RyeStore) => {
+            const option = store.offer.shippingMethods.find(
+              (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId
+            );
+            return {
+              store: store.store,
+              shippingId: option?.id,
+            };
+          }
+        );
+    }
 
     const paymentToken = event.payment.token.paymentData;
     const paymentDetails: SpreedlyAdditionalFields = {
-      first_name: shippingAddress?.givenName ?? '',
-      last_name: shippingAddress?.familyName ?? '',
-      phone_number: shippingAddress?.phoneNumber ?? '',
+      first_name: address?.givenName ?? '',
+      last_name: address?.familyName ?? '',
+      phone_number: address?.phoneNumber ?? '',
       month: '', // For Apple Pay we don't need to pass in CC month
       year: '', // For Apple Pay we don't need to pass in CC year
-      address1: shippingAddress?.addressLines?.at(0) ?? '',
-      address2: shippingAddress?.addressLines?.at(1) ?? '',
-      city: shippingAddress?.locality ?? '',
-      state: shippingAddress?.administrativeArea ?? '',
-      zip: shippingAddress?.postalCode ?? '',
-      country: shippingAddress?.countryCode ?? '',
+      address1: address?.addressLines?.at(0) ?? '',
+      address2: address?.addressLines?.at(1) ?? '',
+      city: address?.locality ?? '',
+      state: address?.administrativeArea ?? '',
+      zip: address?.postalCode ?? '',
+      country: address?.countryCode ?? '',
       metadata: {
         cartId: this.applePayInputParams.cartId,
-        selectedShippingOptions: JSON.stringify(selectedShippingOptions),
+        selectedShippingOptions: JSON.stringify(
+          this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
+        ),
         shopperIp: this.applePayInputParams.shopperIp,
       },
     };
