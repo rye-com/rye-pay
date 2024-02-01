@@ -8,7 +8,7 @@ import {
   cartSubmitResponse,
   ryeShopperIpHeaderKey,
 } from './rye-pay';
-import { isApplePayAddress, isGooglePayAddress } from './utils';
+import { generateFullPostalCode, isApplePayAddress, isGooglePayAddress } from './utils';
 
 type SubmitCartMutationResult = {
   submitCart: SubmitCartResult;
@@ -111,10 +111,13 @@ export class CartService {
 
     headers[ryeShopperIpHeaderKey] = shopperIp;
 
+    const countryCode = shippingAddress?.countryCode ?? '';
+    const postalCode = await generateFullPostalCode(shippingAddress?.postalCode ?? '', countryCode);
+
     let buyerIdentity: any = {
       provinceCode: shippingAddress.administrativeArea ?? '',
-      countryCode: shippingAddress?.countryCode ?? '',
-      postalCode: shippingAddress?.postalCode ?? '',
+      countryCode,
+      postalCode,
     };
 
     if (isApplePayAddress(shippingAddress) && shippingAddress.givenName) {
