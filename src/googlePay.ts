@@ -352,7 +352,7 @@ export class GooglePay {
       },
       shippingOptionRequired: !this.cartHasMultipleStores,
       merchantInfo: {
-        merchantId: '',
+        merchantId: this.spreedlyEnvironmentKey,
       },
       callbackIntents: this.cartHasMultipleStores
         ? undefined
