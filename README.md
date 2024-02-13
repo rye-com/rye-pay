@@ -46,12 +46,12 @@ ryePay.submit(paymentDetails);
 `initParams` is an object with the following fields:
 
 > `apiKey: string`
->
-> Developer's key to access Rye API. Either apiKey or generateJWT function must be provided.
+> 
+> Scheduled for deprecation. Use `generateJWT` instead. Developer's key to access Rye API. Either apiKey or generateJWT function must be provided.
 
 > `generateJWT: () => Promise<string>`
 >
-> Function that is used to generate JWT for authorization. Either generateJWT or apiKey must be provided.
+> Function that is used to generate JWT for authorization. Either generateJWT or apiKey must be provided. See https://docs.rye.com/jwt-authentication for additional details.
 
 > `numberEl: string` <sup>required</sup>
 >
