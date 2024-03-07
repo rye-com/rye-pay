@@ -241,7 +241,10 @@ export class GooglePay {
         },
       };
 
-      const result = await this.cartService.submitCart({ token: paymentToken, paymentDetails });
+      const result = await this.cartService.submitCart({
+        googlePayToken: JSON.parse(paymentToken),
+        paymentDetails,
+      });
       this.onCartSubmitted?.(result.submitCart, result.errors);
     } catch (error) {
       // Handle any errors that occur during the payment process

@@ -104,7 +104,8 @@ export interface InitParams extends SpreedlyInitParams {
 }
 
 export interface ApplePayInputParams {
-  cartId: string;
+  cartId?: string;
+  variantId?: string;
   shopperIp: string;
   merchantDisplayName: string; // The merchant display name that appears on the Apple Pay sheet.
   merchantDomain: string; // The domain on which the Apple Pay button will appear on.
@@ -155,6 +156,7 @@ export interface CartApiSubmitInput {
   id: string;
   token: string;
   applePayToken?: ApplePayToken;
+  googlePayPaymentTokenInput?: GooglePayToken;
   billingAddress: BillingAddress;
   selectedShippingOptions?: SelectedShippingOption[];
   experimentalPromoCodes?: StorePromoCodes[];
@@ -164,6 +166,13 @@ export interface SubmitCartParams {
   token?: string;
   paymentDetails: SpreedlyAdditionalFields;
   applePayToken?: ApplePayToken;
+  googlePayToken?: GooglePayToken;
+}
+
+interface GooglePayToken {
+  signature: string;
+  protocolVersion: string;
+  signedMessage: string;
 }
 
 interface ApplePayToken {
@@ -304,7 +313,7 @@ const prodCartApiEndpoint =
   process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
 const stageCartApiEndpoint =
   process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
-const localCartApiEndpoint = 'http://localhost:3000/v1/query';
+const localCartApiEndpoint = 'https://c5f288b265d5.ngrok.app/v1/query';
 export const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 export const cartSubmitResponse = `
