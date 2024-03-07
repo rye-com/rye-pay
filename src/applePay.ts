@@ -66,6 +66,7 @@ export class ApplePay {
     }
 
     try {
+      // Create cart if cartID was not provided and variantID was provided, otherwise fetch cart with the cartID
       const cartResponse = cartId
         ? await this.cartService.getCart(cartId, shopperIp)
         : await this.cartService.createCart(variantId!, shopperIp);
@@ -76,7 +77,6 @@ export class ApplePay {
       this.cartHasMultipleStores = cartResponse.cart.stores.length > 1;
       this.cartId = cartId ?? cartResponse.cart.id;
 
-      console.log(this.cartCurrency);
       const storeWithoutShippingMethod =
         cartResponse.cart.stores.find((store: RyeStore) => !store.offer.selectedShippingMethod) ??
         null;
