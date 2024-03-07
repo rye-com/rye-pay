@@ -80,7 +80,7 @@ export class ApplePay {
       const storeWithoutShippingMethod =
         cartResponse.cart.stores.find((store: RyeStore) => !store.offer.selectedShippingMethod) ??
         null;
-      
+
       // Cart has multiple stores and at least one store does not have a shipping method selected
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
         this.log(
@@ -100,7 +100,7 @@ export class ApplePay {
     document.head.appendChild(applePayScript);
     applePayScript.onload = () => {
       this.initializeApplePay();
-    }
+    };
   };
 
   /**
