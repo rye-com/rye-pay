@@ -27,6 +27,7 @@ export class CartService {
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private readonly getCartQuery = `query ($id: ID!) { getCart(id: $id) { cart { id cost { subtotal { value currency } tax { value } shipping { value } total { value } } buyerIdentity { firstName lastName address1 address2 city provinceCode countryCode postalCode email phone } stores { ... on AmazonStore { errors { code message details { productIds } } store cartLines { quantity product { id } } offer { errors { code message details { ... on AmazonOfferErrorDetails { productIds } } } subtotal { value displayValue currency } margin { value displayValue currency } notAvailableIds selectedShippingMethod { id label price { value displayValue currency } } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { errors { code message details { variantIds } } store cartLines { quantity variant { id } } offer { errors { code message details { ... on ShopifyOfferErrorDetails { variantIds } } } subtotal { value displayValue currency } margin { value displayValue currency } notAvailableIds selectedShippingMethod { id label price { value displayValue currency } } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } errors { code message } } }`;
   private readonly updateBuyerIdentityMutation = `mutation ($input: CartBuyerIdentityUpdateInput!) { updateCartBuyerIdentity(input: $input) { cart { id stores { ... on AmazonStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { store offer { subtotal { value displayValue currency } shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } } }`;
+  private readonly createCartMutation = `mutation ($input: CartCreateInput!) { createCart(input: $input) { cart { id cost { subtotal { value displayValue currency } tax { value displayValue currency } shipping { value displayValue } total { value displayValue } } buyerIdentity { firstName lastName address1 address2 city provinceCode countryCode postalCode email phone } stores { ... on AmazonStore { errors { code message details { productIds } } isSubmitted store cartLines { quantity product { id } } offer { errors { code message details { ... on AmazonOfferErrorDetails { productIds } } } subtotal { value displayValue currency } margin { value displayValue currency } notAvailableIds shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } ... on ShopifyStore { errors { code message details { variantIds } } isSubmitted store cartLines { quantity variant { id } } offer { errors { code message details { ... on ShopifyOfferErrorDetails { variantIds } } } subtotal { value displayValue currency } margin { value displayValue currency } notAvailableIds shippingMethods { id label price { value displayValue currency } taxes { value displayValue currency } total { value displayValue currency } } } } } } errors { code message } } }`;
   private readonly authService: AuthService;
   private cartApiEndpoint;
 
@@ -49,6 +50,51 @@ export class CartService {
     }
 
     return CartService.instance;
+  }
+
+  /**
+   * The function `createCart` returns the created cart data and any errors.
+   * @param {string} variantId - The `variantId` parameter is a string that represents the unique identifier
+   * of a product variant.
+   * @param {string} shopperIp - The `shopperIp` parameter is the IP address of the shopper. It is used
+   * as a header in the request to the cart API.
+   * @returns {GetCartQueryResult} - the cart data and any potential errors.
+   */
+  public async createCart(variantId: string, shopperIp: string): Promise<any> {
+    const headers: RequestInit['headers'] = {
+      'Content-Type': 'application/json',
+      Authorization: await this.authService.getAuthHeader(),
+      [ryeShopperIpHeaderKey]: shopperIp,
+    };
+
+    const rawResponse = await fetch(this.cartApiEndpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        query: this.createCartMutation,
+        variables: {
+          input: {
+            items: {
+              shopifyCartItemsInput: [
+                {
+                  // Currently only supporting Shopify for Apple Pay
+                  quantity: 1,
+                  variantId,
+                },
+              ],
+            },
+          },
+        },
+      }),
+    });
+
+    const content = await rawResponse.json();
+    const result: GetCartQueryResult = {
+      cart: content?.data?.createCart?.cart as GetCartResult,
+      errors: content?.data?.createCart?.errors as GraphQLError[],
+    };
+
+    return result;
   }
 
   /**
@@ -124,6 +170,7 @@ export class CartService {
       // For Apple Pay
       buyerIdentity = {
         ...buyerIdentity,
+        email: shippingAddress.emailAddress ?? '',
         firstName: shippingAddress.givenName ?? '',
         lastName: shippingAddress.familyName ?? '',
         phone: shippingAddress?.phoneNumber,
@@ -172,10 +219,12 @@ export class CartService {
     token,
     paymentDetails,
     applePayToken,
+    googlePayToken,
   }: SubmitCartParams): Promise<any> {
     const input: CartApiSubmitInput = {
       token: token ?? 'payment_token',
       applePayToken,
+      googlePayPaymentTokenInput: googlePayToken,
       id: paymentDetails.metadata.cartId,
       billingAddress: {
         firstName: paymentDetails.first_name,

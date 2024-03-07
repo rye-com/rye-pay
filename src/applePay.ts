@@ -43,6 +43,7 @@ export class ApplePay {
   private cartCurrency: string = 'USD';
   private cartHasMultipleStores: boolean = false;
   private cartShippingMethods: ShippingMethod[] = [];
+  private cartId: string = '';
 
   constructor({ cartApiEndpoint, applePayInputParams, onCartSubmitted, log }: ApplePayParams) {
     this.cartApiEndpoint = cartApiEndpoint;
@@ -55,38 +56,51 @@ export class ApplePay {
   /**
    * Load Apple Pay and fetch the cart subtotal and currency
    */
+
   loadApplePay = async () => {
-    // Fetch cart subtotal and currency to create the ApplePay PaymentRequest body
+    const { cartId, variantId, shopperIp } = this.applePayInputParams;
+
+    if (!cartId && !variantId) {
+      this.log('Cart ID or Variant ID must be provided');
+      return;
+    }
+
     try {
-      const getCartResponse = await this.cartService.getCart(
-        this.applePayInputParams.cartId,
-        this.applePayInputParams.shopperIp
-      );
+      // Create cart if cartID was not provided and variantID was provided, otherwise fetch cart with the cartID
+      const cartResponse = cartId
+        ? await this.cartService.getCart(cartId, shopperIp)
+        : await this.cartService.createCart(variantId!, shopperIp);
 
-      this.cartSubtotal = Number(getCartResponse.cart.cost.subtotal.value) / 100;
-      this.cartCurrency = getCartResponse.cart.cost.subtotal.currency;
-      this.cartHasMultipleStores = getCartResponse.cart.stores.length > 1;
+      this.cartSubtotal = Number(cartResponse.cart.cost.subtotal.value) / 100;
+      this.cartCurrency = cartResponse.cart.cost.subtotal.currency;
+
+      this.cartHasMultipleStores = cartResponse.cart.stores.length > 1;
+      this.cartId = cartId ?? cartResponse.cart.id;
+
       const storeWithoutShippingMethod =
-        getCartResponse.cart.stores.find(
-          (store: RyeStore) => !store.offer.selectedShippingMethod
-        ) ?? null;
+        cartResponse.cart.stores.find((store: RyeStore) => !store.offer.selectedShippingMethod) ??
+        null;
 
+      // Cart has multiple stores and at least one store does not have a shipping method selected
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
         this.log(
           'Shipping methods need to be selected for all stores in cart to display Apple Pay button.'
         );
       } else {
-        // Show the Apple Pay button
-        const applePayScript = document.createElement('script');
-        applePayScript.src = APPLE_PAY_SCRIPT_URL;
-        document.head.appendChild(applePayScript);
-        applePayScript.onload = () => {
-          this.initializeApplePay();
-        };
+        this.loadApplePayScript();
       }
     } catch (error) {
-      this.log(`Error fetching cart cost: ${error}`);
+      this.log(`Error ${cartId ? 'fetching' : 'creating'} cart: ${error}`);
     }
+  };
+
+  loadApplePayScript = () => {
+    const applePayScript = document.createElement('script');
+    applePayScript.src = APPLE_PAY_SCRIPT_URL;
+    document.head.appendChild(applePayScript);
+    applePayScript.onload = () => {
+      this.initializeApplePay();
+    };
   };
 
   /**
@@ -273,7 +287,7 @@ export class ApplePay {
     // If cart has multiple stores, all shipping options must have already been selected, no reason to update buyer identity again.
     if (!this.cartHasMultipleStores) {
       const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
-        this.applePayInputParams.cartId,
+        this.cartId,
         this.applePayInputParams.shopperIp,
         event.payment.shippingContact!
       );
@@ -307,7 +321,7 @@ export class ApplePay {
       zip: address?.postalCode ?? '',
       country: address?.countryCode ?? '',
       metadata: {
-        cartId: this.applePayInputParams.cartId,
+        cartId: this.cartId,
         selectedShippingOptions: JSON.stringify(
           this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
         ),
@@ -337,7 +351,7 @@ export class ApplePay {
    */
   private getAppleShippingOptions = async (shippingAddress: ApplePayJS.ApplePayPaymentContact) => {
     const content = await this.cartService.updateBuyerIdentity(
-      this.applePayInputParams.cartId,
+      this.cartId,
       this.applePayInputParams.shopperIp,
       shippingAddress
     );
