@@ -158,6 +158,7 @@ export class ApplePay {
         amount: `${this.cartSubtotal}`,
       },
       requiredShippingContactFields,
+      requiredBillingContactFields: ['email', 'name', 'phone', 'postalAddress'],
       shippingMethods: [],
     };
 
@@ -254,7 +255,7 @@ export class ApplePay {
     this.selectedShippingMethod = event.shippingMethod;
     const finalAmount = this.shippingOptions.find(
       (option) => option.identifier === this.selectedShippingMethod?.identifier
-    )?.total.amount;
+    )?.total.amount ?? this.shippingOptions?.at(0)?.total.amount;
 
     if (!finalAmount) {
       this.log('Error calculating total cost including shipping method');
@@ -311,7 +312,7 @@ export class ApplePay {
     const paymentDetails: SpreedlyAdditionalFields = {
       first_name: address?.givenName ?? '',
       last_name: address?.familyName ?? '',
-      phone_number: address?.phoneNumber ?? '',
+      phone_number: event?.payment?.shippingContact?.phoneNumber ?? '',
       month: '', // For Apple Pay we don't need to pass in CC month
       year: '', // For Apple Pay we don't need to pass in CC year
       address1: address?.addressLines?.at(0) ?? '',
@@ -335,8 +336,10 @@ export class ApplePay {
     });
 
     this.onCartSubmitted?.(result.submitCart, result.errors);
+    const failedStore = result.submitCart.cart.stores[0].status === 'PAYMENT_FAILED';
+
     this.applePaySession?.completePayment(
-      result.error ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
+      (result.error || failedStore) ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
     );
   };
 

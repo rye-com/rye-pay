@@ -72,6 +72,10 @@ async function getFullPostalCodeForUK(postalCode: string): Promise<string> {
  * @returns complete postal code string.
  */
 function getFullPostalCodeForCanada(postalCode: string): string {
+  if (postalCode.length === 6) {
+    return postalCode;
+  }
+
   try {
     const fullPostalCode = (
       canadaPostalCodes as {
