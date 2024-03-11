@@ -259,9 +259,10 @@ export class ApplePay {
    */
   private onShippingMethodSelected = (event: ApplePayJS.ApplePayShippingMethodSelectedEvent) => {
     this.selectedShippingMethod = event.shippingMethod;
-    const selectedShippingOption = this.shippingOptions.find(
-      (option) => option.identifier === this.selectedShippingMethod?.identifier
-    ) ?? this.shippingOptions?.at(0);
+    const selectedShippingOption =
+      this.shippingOptions.find(
+        (option) => option.identifier === this.selectedShippingMethod?.identifier
+      ) ?? this.shippingOptions?.at(0);
 
     const finalAmount = selectedShippingOption?.total.amount;
 
@@ -293,12 +294,12 @@ export class ApplePay {
         label: 'Taxes',
         amount: `${selectedShippingOption.taxes.amount}`,
       },
-    ]
+    ];
 
     this.applePaySession?.completeShippingMethodSelection(
       ApplePaySession.STATUS_SUCCESS,
       newTotal,
-      newLineItems,
+      newLineItems
     );
   };
 
@@ -367,7 +368,7 @@ export class ApplePay {
     const failedStore = result.submitCart.cart.stores[0].status === 'PAYMENT_FAILED';
 
     this.applePaySession?.completePayment(
-      (result.error || failedStore) ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
+      result.error || failedStore ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
     );
   };
 
