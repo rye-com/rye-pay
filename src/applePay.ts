@@ -150,8 +150,11 @@ export class ApplePay {
     }
     // Define the Apple Pay payment request
     const merchantCapabilities: ApplePayJS.ApplePayMerchantCapability[] = ['supports3DS'];
-    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = this
-      .cartHasMultipleStores
+
+    const emptyShippingFields =
+      this.cartHasMultipleStores || !this.applePayInputParams.displayShippingAddress;
+
+    const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = emptyShippingFields
       ? []
       : ['email', 'name', 'phone', 'postalAddress'];
     const paymentRequest: ApplePayJS.ApplePayPaymentRequest = {
