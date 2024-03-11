@@ -22,6 +22,12 @@ export type ApplePayParams = {
 };
 
 type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
+  shipping: {
+    amount: number;
+  };
+  taxes: {
+    amount: string;
+  };
   total: {
     amount: string;
   };
@@ -253,9 +259,11 @@ export class ApplePay {
    */
   private onShippingMethodSelected = (event: ApplePayJS.ApplePayShippingMethodSelectedEvent) => {
     this.selectedShippingMethod = event.shippingMethod;
-    const finalAmount = this.shippingOptions.find(
+    const selectedShippingOption = this.shippingOptions.find(
       (option) => option.identifier === this.selectedShippingMethod?.identifier
-    )?.total.amount ?? this.shippingOptions?.at(0)?.total.amount;
+    ) ?? this.shippingOptions?.at(0);
+
+    const finalAmount = selectedShippingOption?.total.amount;
 
     if (!finalAmount) {
       this.log('Error calculating total cost including shipping method');
@@ -267,10 +275,30 @@ export class ApplePay {
       amount: finalAmount,
     };
 
+    console.log(selectedShippingOption);
+
+    const newLineItems = [
+      {
+        type: 'final' as ApplePayJS.ApplePayLineItemType,
+        label: 'Subtotal',
+        amount: `${this.cartSubtotal}`,
+      },
+      {
+        type: 'final' as ApplePayJS.ApplePayLineItemType,
+        label: 'Shipping',
+        amount: `${selectedShippingOption.shipping.amount}`,
+      },
+      {
+        type: 'final' as ApplePayJS.ApplePayLineItemType,
+        label: 'Taxes',
+        amount: `${selectedShippingOption.taxes.amount}`,
+      },
+    ]
+
     this.applePaySession?.completeShippingMethodSelection(
       ApplePaySession.STATUS_SUCCESS,
       newTotal,
-      [] // Apple Pay Line items to display on the pay sheet
+      newLineItems,
     );
   };
 
@@ -366,6 +394,12 @@ export class ApplePay {
           label: shippingMethod.label,
           detail: `${shippingMethod.price.displayValue} ${shippingMethod.price.currency ?? 'USD'}`,
           amount: Number(shippingMethod.price.value) / 100,
+          shipping: {
+            amount: Number(shippingMethod.price.value) / 100,
+          },
+          taxes: {
+            amount: Number(shippingMethod.taxes.value) / 100,
+          },
           total: {
             amount: Number(shippingMethod.total.value) / 100,
           },

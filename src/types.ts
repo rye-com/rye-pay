@@ -14,6 +14,11 @@ export type ShippingMethod = {
     currency: string;
     displayValue: string;
   };
+  taxes: {
+    value: string;
+    currency: string;
+    displayValue: string;
+  };
   total: {
     value: string;
     currency: string;
