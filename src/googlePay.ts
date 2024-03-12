@@ -125,8 +125,8 @@ export class GooglePay {
   private getGooglePayShippingOptions = async (shippingAddress: google.payments.api.Address) => {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
+      shippingAddress!,
       this.googlePayInputParams.shopperIp,
-      shippingAddress!
     );
 
     return (
@@ -202,8 +202,8 @@ export class GooglePay {
         // Update buyer identity with the complete shipping address
         const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
           this.googlePayInputParams.cartId,
+          shippingAddress!,
           this.googlePayInputParams.shopperIp,
-          shippingAddress!
         );
 
         // Get the selected shipping option

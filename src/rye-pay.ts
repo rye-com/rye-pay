@@ -97,8 +97,6 @@ export interface InitParams extends SpreedlyInitParams {
   onValidate?: (inputProperties: InputProperties) => void;
   enableLogging?: boolean;
   environment?: Environment;
-  cartId?: string;
-  shopperIp?: string;
   applePayInputParams?: ApplePayInputParams;
   googlePayInputParams?: GooglePayInputParams;
 }
@@ -106,7 +104,7 @@ export interface InitParams extends SpreedlyInitParams {
 export interface ApplePayInputParams {
   cartId?: string;
   variantId?: string;
-  shopperIp: string;
+  shopperIp?: string;
   merchantDisplayName: string; // The merchant display name that appears on the Apple Pay sheet.
   merchantDomain: string; // The domain on which the Apple Pay button will appear on.
   displayShippingAddress: boolean;

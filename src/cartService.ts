@@ -60,12 +60,15 @@ export class CartService {
    * as a header in the request to the cart API.
    * @returns {GetCartQueryResult} - the cart data and any potential errors.
    */
-  public async createCart(variantId: string, shopperIp: string): Promise<any> {
+  public async createCart(variantId: string, shopperIp?: string): Promise<any> {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
       Authorization: await this.authService.getAuthHeader(),
-      [ryeShopperIpHeaderKey]: shopperIp,
     };
+
+    if (shopperIp) {
+      headers[ryeShopperIpHeaderKey] = shopperIp;
+    }
 
     const rawResponse = await fetch(this.cartApiEndpoint, {
       method: 'POST',
@@ -105,12 +108,15 @@ export class CartService {
    * as a header in the request to the cart API.
    * @returns {GetCartQueryResult} - the cart data and any potential errors.
    */
-  public async getCart(cartId: string, shopperIp: string): Promise<any> {
+  public async getCart(cartId: string, shopperIp?: string): Promise<any> {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
       Authorization: await this.authService.getAuthHeader(),
-      [ryeShopperIpHeaderKey]: shopperIp,
     };
+
+    if (shopperIp) {
+      headers[ryeShopperIpHeaderKey] = shopperIp;
+    }
 
     const rawResponse = await fetch(this.cartApiEndpoint, {
       method: 'POST',
@@ -147,15 +153,17 @@ export class CartService {
    */
   public async updateBuyerIdentity(
     cartId: string,
-    shopperIp: string,
-    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact
+    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
+    shopperIp?: string,
   ) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',
       Authorization: await this.authService.getAuthHeader(),
     };
 
-    headers[ryeShopperIpHeaderKey] = shopperIp;
+    if (shopperIp) {
+      headers[ryeShopperIpHeaderKey] = shopperIp;
+    }
 
     const countryCode = shippingAddress?.countryCode ?? '';
     const postalCode = await generateFullPostalCode(shippingAddress?.postalCode ?? '', countryCode);

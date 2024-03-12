@@ -321,8 +321,8 @@ export class ApplePay {
     if (!this.cartHasMultipleStores) {
       const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
         this.cartId,
+        event.payment.shippingContact!,
         this.applePayInputParams.shopperIp,
-        event.payment.shippingContact!
       );
       const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
 
@@ -387,8 +387,8 @@ export class ApplePay {
   private getAppleShippingOptions = async (shippingAddress: ApplePayJS.ApplePayPaymentContact) => {
     const content = await this.cartService.updateBuyerIdentity(
       this.cartId,
+      shippingAddress,
       this.applePayInputParams.shopperIp,
-      shippingAddress
     );
     const shippingOptions =
       content?.data?.updateCartBuyerIdentity?.cart?.stores
