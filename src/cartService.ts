@@ -154,7 +154,7 @@ export class CartService {
   public async updateBuyerIdentity(
     cartId: string,
     shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
-    shopperIp?: string,
+    shopperIp?: string
   ) {
     const headers: RequestInit['headers'] = {
       'Content-Type': 'application/json',

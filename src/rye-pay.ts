@@ -88,7 +88,11 @@ export interface InitParams extends SpreedlyInitParams {
   cvvEl: string;
   onReady?: (spreedly: Spreedly) => void;
   onErrors?: (errors: SpreedlyError[]) => void;
-  onCartSubmitted?: (submitCartResult?: SubmitCartResult, errors?: GraphQLError[], paymentTokenType?: PaymentTokenType) => void;
+  onCartSubmitted?: (
+    submitCartResult?: SubmitCartResult,
+    errors?: GraphQLError[],
+    paymentTokenType?: PaymentTokenType
+  ) => void;
   onIFrameError?: (error: FrameError) => void;
   onFieldChanged?: (
     name: FrameField,
@@ -114,7 +118,23 @@ export interface ApplePayInputParams {
 }
 
 type ApplePayButtonColor = 'black' | 'white' | 'white-outline';
-type ApplePayButtonType = 'plain' | 'buy' | 'donate' | 'check-out' | 'book' | 'subscribe' | 'reload' | 'add-money' | 'top-up' | 'order' | 'rent' | 'support' | 'contribute' | 'tip' | 'pay' | 'setup';
+type ApplePayButtonType =
+  | 'plain'
+  | 'buy'
+  | 'donate'
+  | 'check-out'
+  | 'book'
+  | 'subscribe'
+  | 'reload'
+  | 'add-money'
+  | 'top-up'
+  | 'order'
+  | 'rent'
+  | 'support'
+  | 'contribute'
+  | 'tip'
+  | 'pay'
+  | 'setup';
 
 export type ApplePayButtonStyles = {
   buttonColor?: ApplePayButtonColor;
@@ -123,7 +143,7 @@ export type ApplePayButtonStyles = {
   heightPixels?: string;
   borderRadiusPixels?: string;
   paddingPixels?: string;
-}
+};
 
 export interface GooglePayInputParams {
   cartId: string;

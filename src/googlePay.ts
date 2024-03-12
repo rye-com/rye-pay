@@ -126,7 +126,7 @@ export class GooglePay {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
       shippingAddress!,
-      this.googlePayInputParams.shopperIp,
+      this.googlePayInputParams.shopperIp
     );
 
     return (
@@ -203,7 +203,7 @@ export class GooglePay {
         const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
           this.googlePayInputParams.cartId,
           shippingAddress!,
-          this.googlePayInputParams.shopperIp,
+          this.googlePayInputParams.shopperIp
         );
 
         // Get the selected shipping option

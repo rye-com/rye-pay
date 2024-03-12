@@ -121,8 +121,14 @@ export class ApplePay {
             // Create Apple Pay button
             const buttonContainer = document.getElementById('rye-apple-pay');
             const button = document.createElement('apple-pay-button');
-            button.setAttribute('buttonstyle', `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`);
-            button.setAttribute('type', `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`);
+            button.setAttribute(
+              'buttonstyle',
+              `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`
+            );
+            button.setAttribute(
+              'type',
+              `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`
+            );
             this.setApplePayStyles();
             button.onclick = async () => await this.onApplePayClicked();
 
@@ -323,7 +329,7 @@ export class ApplePay {
       const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
         this.cartId,
         event.payment.shippingContact!,
-        this.applePayInputParams.shopperIp,
+        this.applePayInputParams.shopperIp
       );
       const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
 
@@ -389,7 +395,7 @@ export class ApplePay {
     const content = await this.cartService.updateBuyerIdentity(
       this.cartId,
       shippingAddress,
-      this.applePayInputParams.shopperIp,
+      this.applePayInputParams.shopperIp
     );
     const shippingOptions =
       content?.data?.updateCartBuyerIdentity?.cart?.stores
@@ -425,5 +431,5 @@ export class ApplePay {
       }
     `;
     document.head.appendChild(style);
-  }
+  };
 }
