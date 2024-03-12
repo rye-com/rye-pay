@@ -121,8 +121,9 @@ export class ApplePay {
             // Create Apple Pay button
             const buttonContainer = document.getElementById('rye-apple-pay');
             const button = document.createElement('apple-pay-button');
-            button.setAttribute('buttonstyle', 'black');
-            button.setAttribute('type', 'buy');
+            button.setAttribute('buttonstyle', `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`);
+            button.setAttribute('type', `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`);
+            this.setApplePayStyles();
             button.onclick = async () => await this.onApplePayClicked();
 
             if (buttonContainer) {
@@ -410,4 +411,19 @@ export class ApplePay {
         })) ?? [];
     return shippingOptions;
   };
+
+  private setApplePayStyles = () => {
+    const style = document.createElement('style');
+    const appliedStyles = this.applePayInputParams?.applePayButtonStyles;
+    style.type = 'text/css';
+    style.textContent = `
+      apple-pay-button {
+        --apple-pay-button-width: ${appliedStyles?.widthPixels ?? '150px'};
+        --apple-pay-button-height: ${appliedStyles?.heightPixels ?? '30px'};
+        --apple-pay-button-border-radius: ${appliedStyles?.borderRadiusPixels ?? '3px'};
+        --apple-pay-button-padding: ${appliedStyles?.paddingPixels ?? '0px 0 px'};
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }

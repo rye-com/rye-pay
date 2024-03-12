@@ -108,6 +108,16 @@ export interface ApplePayInputParams {
   merchantDisplayName: string; // The merchant display name that appears on the Apple Pay sheet.
   merchantDomain: string; // The domain on which the Apple Pay button will appear on.
   displayShippingAddress: boolean;
+  applePayButtonStyles?: ApplePayButtonStyles;
+}
+
+export type ApplePayButtonStyles = {
+  buttonColor?: 'black' | 'white' | 'white-outline';
+  buttonType?: 'plain' | 'add-money' | 'buy' | 'donate' | 'check-out' | 'book' | 'continue' | 'contribute' | 'order' | 'pay' | 'reload' | 'rent' | 'set-up' | 'subscribe' | 'support' | 'tip' | 'top-up';
+  widthPixels?: string;
+  heightPixels?: string;
+  borderRadiusPixels?: string;
+  paddingPixels?: string;
 }
 
 export interface GooglePayInputParams {
