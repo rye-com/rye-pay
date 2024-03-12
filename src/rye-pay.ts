@@ -78,6 +78,8 @@ type FrameEventType =
   | 'shiftTab';
 type Environment = 'prod' | 'stage' | 'local';
 
+type PaymentTokenType = 'APPLE_PAY' | 'GOOGLE_PAY' | 'VAULT';
+
 // RyePay params for init method
 export interface InitParams extends SpreedlyInitParams {
   apiKey?: string;
@@ -86,7 +88,7 @@ export interface InitParams extends SpreedlyInitParams {
   cvvEl: string;
   onReady?: (spreedly: Spreedly) => void;
   onErrors?: (errors: SpreedlyError[]) => void;
-  onCartSubmitted?: (submitCartResult?: SubmitCartResult, errors?: GraphQLError[]) => void;
+  onCartSubmitted?: (submitCartResult?: SubmitCartResult, errors?: GraphQLError[], paymentTokenType?: PaymentTokenType) => void;
   onIFrameError?: (error: FrameError) => void;
   onFieldChanged?: (
     name: FrameField,
@@ -111,9 +113,12 @@ export interface ApplePayInputParams {
   applePayButtonStyles?: ApplePayButtonStyles;
 }
 
+type ApplePayButtonColor = 'black' | 'white' | 'white-outline';
+type ApplePayButtonType = 'plain' | 'buy' | 'donate' | 'check-out' | 'book' | 'subscribe' | 'reload' | 'add-money' | 'top-up' | 'order' | 'rent' | 'support' | 'contribute' | 'tip' | 'pay' | 'setup';
+
 export type ApplePayButtonStyles = {
-  buttonColor?: 'black' | 'white' | 'white-outline';
-  buttonType?: 'plain' | 'add-money' | 'buy' | 'donate' | 'check-out' | 'book' | 'continue' | 'contribute' | 'order' | 'pay' | 'reload' | 'rent' | 'set-up' | 'subscribe' | 'support' | 'tip' | 'top-up';
+  buttonColor?: ApplePayButtonColor;
+  buttonType?: ApplePayButtonType;
   widthPixels?: string;
   heightPixels?: string;
   borderRadiusPixels?: string;
@@ -538,7 +543,7 @@ export class RyePay {
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
         this.log(`payment method token: ${token}`);
         const result = await this.submitCart({ token, paymentDetails });
-        onCartSubmitted?.(result.submitCart, result.errors);
+        onCartSubmitted?.(result.submitCart, result.errors, 'VAULT');
       }
     );
   }

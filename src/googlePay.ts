@@ -245,7 +245,7 @@ export class GooglePay {
         googlePayToken: JSON.parse(paymentToken),
         paymentDetails,
       });
-      this.onCartSubmitted?.(result.submitCart, result.errors);
+      this.onCartSubmitted?.(result.submitCart, result.errors, 'GOOGLE_PAY');
     } catch (error) {
       // Handle any errors that occur during the payment process
       this.log('Payment failed: ', JSON.stringify(error));

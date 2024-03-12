@@ -368,7 +368,7 @@ export class ApplePay {
       paymentDetails,
     });
 
-    this.onCartSubmitted?.(result.submitCart, result.errors);
+    this.onCartSubmitted?.(result.submitCart, result.errors, 'APPLE_PAY');
     const failedStore = result.submitCart.cart.stores[0].status === 'PAYMENT_FAILED';
 
     this.applePaySession?.completePayment(
