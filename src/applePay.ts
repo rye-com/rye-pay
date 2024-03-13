@@ -44,11 +44,15 @@ export class ApplePay {
   private applePaySession: ApplePaySession | undefined;
   private shippingOptions: RyeAppleShippingMethod[] = [];
   private selectedShippingMethod: ApplePayJS.ApplePayShippingMethod | undefined;
+  private predefinedSelectedShippingMethod:
+    | (RyeAppleShippingMethod & { store: RyeStore })
+    | undefined;
   private cartService: CartService;
   private cartSubtotal: number | undefined;
   private cartCurrency: string = 'USD';
   private cartHasMultipleStores: boolean = false;
   private cartShippingMethods: ShippingMethod[] = [];
+  private cartTotal: number | undefined;
   private cartId: string = '';
 
   constructor({ cartApiEndpoint, applePayInputParams, onCartSubmitted, log }: ApplePayParams) {
@@ -76,6 +80,32 @@ export class ApplePay {
       const cartResponse = cartId
         ? await this.cartService.getCart(cartId, shopperIp)
         : await this.cartService.createCart(variantId!, shopperIp);
+
+      // If Cart ID was provided, check if cart already has a shipping method selected
+      if (cartId && cartResponse.cart.stores[0].offer.selectedShippingMethod) {
+        const selectedShippingMethod = cartResponse.cart.stores[0].offer.selectedShippingMethod;
+        console.log(selectedShippingMethod);
+        this.predefinedSelectedShippingMethod = {
+          label: selectedShippingMethod.label,
+          detail: `${selectedShippingMethod.price.displayValue} ${
+            selectedShippingMethod.price.currency ?? 'USD'
+          }`,
+          amount: `${Number(selectedShippingMethod.price.value) / 100}`,
+          identifier: selectedShippingMethod.id,
+          store: cartResponse.cart.stores[0],
+          shipping: {
+            amount: Number(selectedShippingMethod.price.value) / 100,
+          },
+          taxes: {
+            amount: selectedShippingMethod.taxes.value,
+          },
+          total: {
+            amount: selectedShippingMethod.total.value,
+          },
+        };
+
+        this.cartTotal = Number(selectedShippingMethod.total.value) / 100;
+      }
 
       this.cartSubtotal = Number(cartResponse.cart.cost.subtotal.value) / 100;
       this.cartCurrency = cartResponse.cart.cost.subtotal.currency;
@@ -162,8 +192,29 @@ export class ApplePay {
       this.cartHasMultipleStores || !this.applePayInputParams.displayShippingAddress;
 
     const requiredShippingContactFields: ApplePayJS.ApplePayContactField[] = emptyShippingFields
-      ? []
+      ? ['phone']
       : ['email', 'name', 'phone', 'postalAddress'];
+
+    const lineItems = this.predefinedSelectedShippingMethod
+      ? [
+          {
+            type: 'final' as ApplePayJS.ApplePayLineItemType,
+            label: 'Subtotal',
+            amount: `${this.cartSubtotal}`,
+          },
+          {
+            type: 'final' as ApplePayJS.ApplePayLineItemType,
+            label: 'Shipping',
+            amount: `${this.predefinedSelectedShippingMethod.shipping.amount}`,
+          },
+          {
+            type: 'final' as ApplePayJS.ApplePayLineItemType,
+            label: 'Taxes',
+            amount: `${this.predefinedSelectedShippingMethod.taxes.amount}`,
+          },
+        ]
+      : [];
+
     const paymentRequest: ApplePayJS.ApplePayPaymentRequest = {
       countryCode: 'US',
       currencyCode: this.cartCurrency,
@@ -171,11 +222,12 @@ export class ApplePay {
       merchantCapabilities,
       total: {
         label: this.applePayInputParams.merchantDisplayName ?? '',
-        amount: `${this.cartSubtotal}`,
+        amount: `${this.cartTotal ?? this.cartSubtotal}`,
       },
       requiredShippingContactFields,
       requiredBillingContactFields: ['email', 'name', 'phone', 'postalAddress'],
       shippingMethods: [],
+      lineItems,
     };
 
     // Create an ApplePaySession
@@ -325,7 +377,7 @@ export class ApplePay {
 
     // BuyerIdentity for cart is only required if the cart has multiple stores.
     // If cart has multiple stores, all shipping options must have already been selected, no reason to update buyer identity again.
-    if (!this.cartHasMultipleStores) {
+    if (!this.cartHasMultipleStores && !this.predefinedSelectedShippingMethod) {
       const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
         this.cartId,
         event.payment.shippingContact!,
@@ -345,6 +397,13 @@ export class ApplePay {
             };
           }
         );
+    } else if (this.predefinedSelectedShippingMethod) {
+      selectedShippingOptions = [
+        {
+          store: this.predefinedSelectedShippingMethod.store.store,
+          shippingId: this.predefinedSelectedShippingMethod.identifier,
+        },
+      ];
     }
 
     const paymentToken = event.payment.token.paymentData;

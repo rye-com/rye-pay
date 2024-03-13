@@ -1,6 +1,7 @@
 import { ApplePay } from './applePay';
 import { AuthService } from './authService';
 import { GooglePay } from './googlePay';
+import { RyeStore } from './types';
 
 // Original Spreedly interface (only used api covered)
 interface Spreedly {
@@ -249,6 +250,7 @@ export interface GetCartResult {
       currency: string;
     };
   };
+  stores: RyeStore[];
 }
 
 export interface SubmitCartResult {
