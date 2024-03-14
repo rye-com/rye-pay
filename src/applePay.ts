@@ -82,9 +82,14 @@ export class ApplePay {
         : await this.cartService.createCart(variantId!, shopperIp);
 
       // If Cart ID was provided, check if cart already has a shipping method selected
-      if (cartId && cartResponse.cart.stores[0].offer.selectedShippingMethod) {
-        const selectedShippingMethod = cartResponse.cart.stores[0].offer.selectedShippingMethod;
-        console.log(selectedShippingMethod);
+      if (
+        (cartId && cartResponse.cart.stores[0].offer.selectedShippingMethod) ||
+        !this.applePayInputParams.displayShippingAddress
+      ) {
+        const selectedShippingMethod =
+          cartResponse.cart.stores[0].offer.selectedShippingMethod ??
+          cartResponse.cart.stores[0].offer.shippingMethods[0];
+
         this.predefinedSelectedShippingMethod = {
           label: selectedShippingMethod.label,
           detail: `${selectedShippingMethod.price.displayValue} ${
@@ -337,8 +342,6 @@ export class ApplePay {
       label: this.applePayInputParams.merchantDisplayName ?? '',
       amount: finalAmount,
     };
-
-    console.log(selectedShippingOption);
 
     const newLineItems = [
       {
