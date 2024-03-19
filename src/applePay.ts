@@ -26,10 +26,10 @@ type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
     amount: number;
   };
   taxes: {
-    amount: string;
+    amount: number;
   };
   total: {
-    amount: string;
+    amount: number;
   };
 };
 
@@ -102,10 +102,10 @@ export class ApplePay {
             amount: Number(selectedShippingMethod.price.value) / 100,
           },
           taxes: {
-            amount: selectedShippingMethod.taxes.value,
+            amount: Number(selectedShippingMethod.taxes.value) / 100,
           },
           total: {
-            amount: selectedShippingMethod.total.value,
+            amount: Number(selectedShippingMethod.total.value) / 100,
           },
         };
 
@@ -340,7 +340,7 @@ export class ApplePay {
 
     const newTotal = {
       label: this.applePayInputParams.merchantDisplayName ?? '',
-      amount: finalAmount,
+      amount: `${finalAmount}`,
     };
 
     const newLineItems = [
