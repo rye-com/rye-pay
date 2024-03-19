@@ -94,6 +94,12 @@ ryePay.submit(paymentDetails);
 
 As soon as the user filled the payment form and the cart is ready to be submitted, the developer should call `ryePay.submit(paymentDetails)`. To handle the result the developer should provide `onCartSubmitted` callback in the `init` method. This method will submit the cart, make a payment transaction using specified credit card data and create an order per each store in the cart.
 
+> NOTE: Please pass in the billing address, not the shipping address.
+
+> The address that is stored in the Rye Cart, is the shipping address.
+> The address that will be passed in the `paymentDetails` object, is the billing address.
+
+
 `paymentDetails` is an object with the following fields:
 
 > `cartId: string` <sup>required</sup>
