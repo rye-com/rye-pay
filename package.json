@@ -10,11 +10,11 @@
   "typings": "dist/index.d.ts",
   "sideEffects": false,
   "scripts": {
-    "test": "echo \"There is no tests in this package\"",
+    "build": "tsc",
+    "bundle": "mkdir -p public && browserify ./src/index.ts -p [ tsify --noImplicitAny ] -s rye > ./public/rye-pay.js",
     "check-format": "prettier --check \"**/*.ts\"",
     "format": "prettier --write \"**/*.ts\"",
-    "build": "tsc",
-    "bundle": "mkdir -p public && browserify ./src/index.ts -p [ tsify --noImplicitAny ] -s rye > ./public/rye-pay.js"
+    "test": "echo \"There is no tests in this package\""
   },
   "author": "RYE",
   "license": "ISC",
