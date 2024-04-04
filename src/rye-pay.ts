@@ -83,7 +83,16 @@ type PaymentTokenType = 'APPLE_PAY' | 'GOOGLE_PAY' | 'VAULT';
 
 // RyePay params for init method
 export interface InitParams extends SpreedlyInitParams {
+  /**
+   * @deprecated Use `generateJWT` instead. This field will be removed in the next major release.
+   */
   apiKey?: string;
+  /**
+   * This method should hit an endpoint on your backend which generates a valid JWT
+   * for use in frontend requests to the Rye API.
+   *
+   * @see https://docs.rye.com/jwt-authentication
+   */
   generateJWT?: () => Promise<string>;
   numberEl: string;
   cvvEl: string;
@@ -111,6 +120,10 @@ export interface InitParams extends SpreedlyInitParams {
 export interface ApplePayInputParams {
   cartId?: string;
   variantId?: string;
+  /**
+   * @deprecated This field is not required when using JWT authentication.
+   * @see {@link InitParams.generateJWT}
+   */
   shopperIp?: string;
   merchantDisplayName: string; // The merchant display name that appears on the Apple Pay sheet.
   merchantDomain: string; // The domain on which the Apple Pay button will appear on.
@@ -148,6 +161,10 @@ export type ApplePayButtonStyles = {
 
 export interface GooglePayInputParams {
   cartId: string;
+  /**
+   * @deprecated This field is not required when using JWT authentication.
+   * @see {@link InitParams.generateJWT}
+   */
   shopperIp: string;
 }
 
@@ -168,6 +185,10 @@ interface SubmitAdditionalFields {
 interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
+  /**
+   * @deprecated This field is not required when using JWT authentication.
+   * @see {@link InitParams.generateJWT}
+   */
   shopperIp?: string;
   experimentalPromoCodes?: StorePromoCodes[];
 }
@@ -177,6 +198,10 @@ export interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
   metadata: {
     cartId: string;
     selectedShippingOptions?: string;
+    /**
+     * @deprecated This field is not required when using JWT authentication.
+     * @see {@link InitParams.generateJWT}
+     */
     shopperIp?: string;
     experimentalPromoCodes?: string;
   };
