@@ -60,22 +60,21 @@ export class AuthService {
   private mapJWTEndpointOrThrow(jwt: string) {
     try {
       const data = jwtDecode(jwt);
-
       const environment = Object.values(config.environments).find(
         (env) => env.audience === data.aud
       );
-      const validAudienceValues = Object.values(config.environments).map((env) => env.audience);
 
-      if (!environment) {
-        throw new RyePayError({
-          code: 'BAD_AUTHORIZATION',
-          message: `The provided JWT token does not match any known Rye API environment. The \`aud\` field of your JWT must be one of the following values: ${validAudienceValues.join(
-            ', '
-          )}`,
-        });
+      if (environment) {
+        return environment.url;
       }
 
-      return environment.url;
+      const validAudienceValues = Object.values(config.environments).map((env) => env.audience);
+      throw new RyePayError({
+        code: 'BAD_AUTHORIZATION',
+        message: `The provided JWT token does not match any known Rye API environment. The \`aud\` field of your JWT must be one of the following values: ${validAudienceValues.join(
+          ', '
+        )}`,
+      });
     } catch (error) {
       // `jwtDecode` throws when the token is malformed
       throw new RyePayError({
