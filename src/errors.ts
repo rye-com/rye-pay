@@ -33,8 +33,16 @@ export class RyePayError extends Error {
     };
   }
 
+  get [Symbol.toStringTag]() {
+    return this.toString();
+  }
+
+  toString() {
+    return `${this.name}: ${this.message} (${this.code})`;
+  }
+
   static is(value: any): value is RyePayError {
-    return value !== null && typeof value === 'object' && value.isRyePayError;
+    return Boolean(value !== null && typeof value === 'object' && value.isRyePayError);
   }
 }
 
