@@ -20,4 +20,5 @@ export const config = {
       url: process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query',
     },
   } satisfies Record<Environment, EnvironmentConfig>,
+  spreedlyScriptUrl: 'https://core.spreedly.com/iframe/iframe-v1.min.js',
 };

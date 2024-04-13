@@ -4,6 +4,8 @@ import { CartService } from './cartService';
 import { GooglePay } from './googlePay';
 import { Logger } from './logger';
 
+import { createDeferred } from './util/deferred';
+import { loadSpreedly, tryGetSpreedly } from './util/spreedly';
 import { RyePayError } from './errors';
 
 import type { GenerateJWTFunction, RyeStore } from './types';
@@ -394,25 +396,30 @@ errors {
 }
 `;
 
+type ReadyState =
+  | { status: 'idle' }
+  | { status: 'initializing'; promise: Promise<void> }
+  | { status: 'initialized' };
+
 export class RyePay {
-  private initializing = false;
-  private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
+  /**
+   * Indicates whether Rye Pay has been initialized.
+   */
+  get initialized() {
+    return this.readyState.status === 'initialized';
+  }
+
+  private readyState: ReadyState = { status: 'idle' };
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private readonly envTokenQuery = `query {
     environmentToken {
        token
     }
   }`;
-  private spreedly!: Spreedly;
+
   private authService!: AuthService;
   private envToken = '';
   private logger = new Logger();
-
-  /**
-   * Indicates whether the Rye Pay has been initialized.
-   */
-  public initialized = false;
-
   private initParams: InitParams | undefined;
 
   /**
@@ -420,7 +427,7 @@ export class RyePay {
    *
    * This method should be called before calling any other methods of Rye Pay.
    */
-  init(params: InitParams) {
+  init(params: InitParams): Promise<void> {
     this.initParams = params;
 
     const {
@@ -433,16 +440,13 @@ export class RyePay {
       googlePayInputParams,
     } = params;
 
-    if (this.initializing) {
-      return;
+    if (this.readyState.status === 'initializing') {
+      return this.readyState.promise;
     }
-    if (this.initialized) {
+    if (this.readyState.status === 'initialized') {
       this.reload();
-      return;
+      return Promise.resolve();
     }
-
-    this.initializing = true;
-    this.envToken = '';
 
     if (!generateJWT) {
       const errorMsg = 'The `generateJWT` must be provided when initializing Rye Pay.';
@@ -454,7 +458,7 @@ export class RyePay {
             message: errorMsg,
           },
         ]);
-        return;
+        return Promise.resolve();
       }
 
       throw new RyePayError({
@@ -463,51 +467,41 @@ export class RyePay {
       });
     }
 
-    this.authService = AuthService.getInstance(generateJWT);
+    const deferred = createDeferred();
+    this.readyState = {
+      status: 'initializing',
+      promise: deferred.promise,
+    };
 
-    if (this.hasSpreedlyGlobal()) {
-      return;
-    }
+    this.authService = AuthService.getInstance(generateJWT);
+    this.envToken = '';
 
     if (typeof enableLogging === 'boolean') {
       this.logger.setEnabled(enableLogging);
     }
 
-    const script = document.createElement('script');
-    document.head.appendChild(script);
+    loadSpreedly()
+      .then(async (spreedly) => {
+        this.envToken = await this.getEnvToken();
+        this.subscribeToEvents(params);
 
-    const scriptLoadingErrorMsg = 'Error loading Spreedly';
-    script.onerror = (error) => {
-      throw new RyePayError({
-        cause: error,
-        code: 'LOAD_FAILED',
-        message: scriptLoadingErrorMsg,
-      });
-    };
-    script.onload = async () => {
-      if (!this.hasSpreedlyGlobal()) {
-        throw new RyePayError({
-          code: 'LOAD_FAILED',
-          message: scriptLoadingErrorMsg,
+        spreedly.init(this.envToken, {
+          numberEl,
+          cvvEl,
         });
-      }
 
-      this.spreedly = (globalThis as any).Spreedly;
-      this.envToken = await this.getEnvToken();
-      this.subscribeToEvents(params);
+        this.readyState = { status: 'initialized' };
+        this.logger.log('Spreedly initialized');
 
-      this.spreedly.init(this.envToken, {
-        numberEl,
-        cvvEl,
+        deferred.resolve();
+      })
+      .catch((error) => {
+        throw new RyePayError({
+          cause: error,
+          code: 'LOAD_FAILED',
+          message: 'Error loading Spreedly',
+        });
       });
-
-      this.initializing = false;
-      this.initialized = true;
-      this.logger.log('Spreedly initialized');
-    };
-
-    // trigger script loading
-    script.src = this.spreedlyScriptUrl;
 
     const cartService = new CartService(this.authService);
 
@@ -546,6 +540,8 @@ export class RyePay {
         applePay.loadApplePay();
       }
     }
+
+    return deferred.promise;
   }
 
   private subscribeToEvents({
@@ -556,16 +552,18 @@ export class RyePay {
     onErrors,
     onCartSubmitted,
   }: InitParams) {
-    this.spreedly.removeHandlers();
+    const spreedly = this.assertSpreedly();
+
+    spreedly.removeHandlers();
     // Subscribe to optional events only if developers wants to handle them
-    onReady && this.spreedly.on('ready', () => onReady(this.spreedly));
-    onFieldChanged && this.spreedly.on('fieldEvent', onFieldChanged);
-    onValidate && this.spreedly.on('validation', onValidate);
-    onIFrameError && this.spreedly.on('consoleError', onIFrameError);
-    onErrors && this.spreedly.on('errors', onErrors);
+    onReady && spreedly.on('ready', () => onReady(spreedly));
+    onFieldChanged && spreedly.on('fieldEvent', onFieldChanged);
+    onValidate && spreedly.on('validation', onValidate);
+    onIFrameError && spreedly.on('consoleError', onIFrameError);
+    onErrors && spreedly.on('errors', onErrors);
 
     // Triggers after tokenizeCreditCard was called
-    this.spreedly.on(
+    spreedly.on(
       'paymentMethod',
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
         const result = await this.submitCart({ token, paymentDetails });
@@ -582,7 +580,9 @@ export class RyePay {
       throw new Error('cartId must be provided');
     }
 
-    this.spreedly.tokenizeCreditCard({
+    const spreedly = this.assertSpreedly('submit');
+
+    spreedly.tokenizeCreditCard({
       ...paymentDetails,
       metadata: {
         cartId: paymentDetails.cartId,
@@ -597,7 +597,9 @@ export class RyePay {
    * When reload is complete, the ready event will be fired, at which time the iFrame can be customized.
    */
   reload() {
-    this.spreedly.reload();
+    const spreedly = this.assertSpreedly('reload');
+
+    spreedly.reload();
     if (this.initParams) {
       this.subscribeToEvents(this.initParams);
     }
@@ -607,7 +609,8 @@ export class RyePay {
    * Request iFrame fields to report their validation status. Useful for real-time validation functionality.
    */
   validate() {
-    this.spreedly.validate();
+    const spreedly = this.assertSpreedly('validate');
+    spreedly.validate();
   }
 
   // Field customization methods
@@ -616,21 +619,24 @@ export class RyePay {
    * Style iFrame fields using CSS.
    */
   setStyle(field: FrameField, style: string) {
-    this.spreedly.setStyle(field, style);
+    const spreedly = this.assertSpreedly('setStyle');
+    spreedly.setStyle(field, style);
   }
 
   /**
    * Set the input type of the iFrame fields. This is useful to when you want different keyboards to display on mobile devices.
    */
   setFieldType(field: FrameField, type: FieldType) {
-    this.spreedly.setFieldType(field, type);
+    const spreedly = this.assertSpreedly('setFieldType');
+    spreedly.setFieldType(field, type);
   }
 
   /**
    * Style iFrame fields’ label. Although the label for each iFrame field is not displayed, it is still used by screen readers and other accessibility devices.
    */
   setLabel(field: FrameField, label: string) {
-    this.spreedly.setLabel(field, label);
+    const spreedly = this.assertSpreedly('setLabel');
+    spreedly.setLabel(field, label);
   }
 
   /**
@@ -638,21 +644,24 @@ export class RyePay {
    * it can still be used by screen readers and other accessibility devices.
    */
   setTitle(field: FrameField, title: string) {
-    this.spreedly.setTitle(field, title);
+    const spreedly = this.assertSpreedly('setTitle');
+    spreedly.setTitle(field, title);
   }
 
   /**
    * Style iFrame fields’ placeholder text.
    */
   setPlaceholder(field: FrameField, placeholder: string) {
-    this.spreedly.setPlaceholder(field, placeholder);
+    const spreedly = this.assertSpreedly('setPlaceholder');
+    spreedly.setPlaceholder(field, placeholder);
   }
 
   /**
    * Set the value the iFrame fields to a known test value. Any values that are not on the allowed list will be silently rejected.
    */
   setValue(field: FrameField, value: number) {
-    this.spreedly.setValue(field, value);
+    const spreedly = this.assertSpreedly('setValue');
+    spreedly.setValue(field, value);
   }
 
   /**
@@ -660,7 +669,8 @@ export class RyePay {
    * The number field must be set to type text or tel for pretty formatting to take effect.
    */
   setNumberFormat(format: NumberFormat) {
-    this.spreedly.setNumberFormat(format);
+    const spreedly = this.assertSpreedly('setNumberFormat');
+    spreedly.setNumberFormat(format);
   }
 
   /**
@@ -668,7 +678,8 @@ export class RyePay {
    * By default, the autocomplete attribute is enabled, so the first call of this function will disable autocomplete
    */
   toggleAutoComplete() {
-    this.spreedly.toggleAutoComplete();
+    const spreedly = this.assertSpreedly('toggleAutoComplete');
+    spreedly.toggleAutoComplete();
   }
 
   /**
@@ -676,7 +687,8 @@ export class RyePay {
    * or if you want to auto-focus one of the iFrame fields if they contain an input error.
    */
   transferFocus(field: FrameField) {
-    this.spreedly.transferFocus(field);
+    const spreedly = this.assertSpreedly('transferFocus');
+    spreedly.transferFocus(field);
   }
 
   private getEnvToken = async () => {
@@ -743,7 +755,17 @@ export class RyePay {
     return result;
   }
 
-  private hasSpreedlyGlobal() {
-    return !!(globalThis as any).Spreedly;
+  private assertSpreedly(method?: string) {
+    const spreedly = tryGetSpreedly();
+    if (!spreedly) {
+      throw new RyePayError({
+        code: 'NOT_READY',
+        message: method
+          ? `The ${method} method was called before Spreedly was initialized. Make sure to call the \`init\` method first, and wait for the returned promise to resolve.`
+          : 'Rye Pay encountered an internal error when trying to access Spreedly. This is a bug in Rye Pay. Please open a ticket at https://github.com/rye-com/rye-pay.',
+      });
+    }
+
+    return spreedly;
   }
 }

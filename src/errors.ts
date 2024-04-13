@@ -1,4 +1,9 @@
-export type RyePayErrorCode = 'BAD_AUTHORIZATION' | 'LOAD_FAILED' | 'INTERNAL' | 'INVALID_CONFIG';
+export type RyePayErrorCode =
+  | 'BAD_AUTHORIZATION'
+  | 'LOAD_FAILED'
+  | 'INTERNAL'
+  | 'INVALID_CONFIG'
+  | 'NOT_READY';
 
 interface RyePayErrorProps {
   cause?: unknown;
