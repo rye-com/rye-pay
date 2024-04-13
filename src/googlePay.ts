@@ -1,45 +1,45 @@
 import { CartService } from './cartService';
 import { GOOGLE_PAY_SCRIPT_URL } from './constants';
+import type { Logger } from './logger';
 import { GooglePayInputParams, InitParams, SpreedlyAdditionalFields } from './rye-pay';
-import { RyeStore, ShippingMethod } from './types';
+
+import type { RyeStore, ShippingMethod } from './types';
 
 export type GooglePayParams = {
-  cartApiEndpoint: string;
+  cartService: CartService;
   googlePayInputParams: GooglePayInputParams;
+  logger: Logger;
   spreedlyEnvironmentKey: string;
   onCartSubmitted: InitParams['onCartSubmitted'];
-  log: (...args: any) => void;
 };
 
 /* The GooglePay class is responsible for handling the integration of Google Pay into a web
 application, including loading the Google Pay script, initializing Google Pay, and handling payment
 data changes and user interactions. */
 export class GooglePay {
-  private cartApiEndpoint: string;
   private onCartSubmitted: InitParams['onCartSubmitted'];
   private spreedlyEnvironmentKey: string;
   private cartService: CartService;
   private googlePayInputParams: GooglePayInputParams;
-  private log: (...args: any) => void;
   private googlePayFinalPrice: number = 0;
   private googlePayFinalCurrency: string = 'USD';
   private googlePayShippingOptions: any[] = [];
+  private logger: Logger;
   private cartSubtotal: number | undefined;
   private cartCurrency: string = 'USD';
   private cartHasMultipleStores: boolean = false;
   private cartShippingMethods: ShippingMethod[] = [];
 
   constructor({
-    cartApiEndpoint,
+    cartService,
     googlePayInputParams,
+    logger,
     spreedlyEnvironmentKey,
-    log,
   }: GooglePayParams) {
-    this.cartApiEndpoint = cartApiEndpoint;
+    this.cartService = cartService;
     this.googlePayInputParams = googlePayInputParams;
     this.spreedlyEnvironmentKey = spreedlyEnvironmentKey;
-    this.log = log;
-    this.cartService = CartService.getInstance(this.cartApiEndpoint);
+    this.logger = logger;
   }
 
   /**
@@ -47,10 +47,7 @@ export class GooglePay {
    */
   loadGooglePay = async () => {
     try {
-      const getCartResponse = await this.cartService.getCart(
-        this.googlePayInputParams.cartId,
-        this.googlePayInputParams.shopperIp
-      );
+      const getCartResponse = await this.cartService.getCart(this.googlePayInputParams.cartId);
 
       this.cartSubtotal = Number(getCartResponse.cart.cost.subtotal.value) / 100;
       this.cartCurrency = getCartResponse.cart.cost.subtotal.currency;
@@ -61,7 +58,7 @@ export class GooglePay {
         ) ?? null;
 
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
-        this.log(
+        this.logger.error(
           'Shipping methods need to be selected for all stores in cart to display Google Pay button.'
         );
       } else {
@@ -76,7 +73,7 @@ export class GooglePay {
         };
       }
     } catch (error) {
-      this.log(`Error fetching cart cost: ${error}`);
+      this.logger.error(`Error fetching cart cost: ${error}`);
     }
   };
 
@@ -110,7 +107,7 @@ export class GooglePay {
     if (buttonContainer) {
       buttonContainer.appendChild(button);
     } else {
-      this.log('Google Pay button container not found');
+      this.logger.warn('Google Pay button container not found');
     }
   };
 
@@ -125,8 +122,7 @@ export class GooglePay {
   private getGooglePayShippingOptions = async (shippingAddress: google.payments.api.Address) => {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
-      shippingAddress!,
-      this.googlePayInputParams.shopperIp
+      shippingAddress!
     );
 
     return (
@@ -202,8 +198,7 @@ export class GooglePay {
         // Update buyer identity with the complete shipping address
         const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
           this.googlePayInputParams.cartId,
-          shippingAddress!,
-          this.googlePayInputParams.shopperIp
+          shippingAddress!
         );
 
         // Get the selected shipping option
@@ -237,7 +232,6 @@ export class GooglePay {
           selectedShippingOptions: JSON.stringify(
             this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
           ),
-          shopperIp: this.googlePayInputParams.shopperIp,
         },
       };
 
@@ -248,7 +242,7 @@ export class GooglePay {
       this.onCartSubmitted?.(result.submitCart, result.errors, 'GOOGLE_PAY');
     } catch (error) {
       // Handle any errors that occur during the payment process
-      this.log('Payment failed: ', JSON.stringify(error));
+      this.logger.error('Payment failed: ', JSON.stringify(error));
     }
   };
 
@@ -269,7 +263,7 @@ export class GooglePay {
     )?.finalValue;
 
     if (!this.googlePayFinalPrice) {
-      this.log('Unexpected error calculating updated price.');
+      this.logger.error('Unexpected error calculating updated price.');
     }
 
     return {

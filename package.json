@@ -30,6 +30,7 @@
     "dist/"
   ],
   "dependencies": {
+    "jwt-decode": "^4.0.0",
     "tsify": "^5.0.4"
   },
   "volta": {
