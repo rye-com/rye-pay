@@ -1,45 +1,45 @@
 import { CartService } from './cartService';
 import { GOOGLE_PAY_SCRIPT_URL } from './constants';
+import type { Logger } from './logger';
 import { GooglePayInputParams, InitParams, SpreedlyAdditionalFields } from './rye-pay';
-import { RyeStore, ShippingMethod } from './types';
+
+import type { RyeStore, ShippingMethod } from './types';
 
 export type GooglePayParams = {
-  cartApiEndpoint: string;
+  cartService: CartService;
   googlePayInputParams: GooglePayInputParams;
+  logger: Logger;
   spreedlyEnvironmentKey: string;
   onCartSubmitted: InitParams['onCartSubmitted'];
-  log: (...args: any) => void;
 };
 
 /* The GooglePay class is responsible for handling the integration of Google Pay into a web
 application, including loading the Google Pay script, initializing Google Pay, and handling payment
 data changes and user interactions. */
 export class GooglePay {
-  private cartApiEndpoint: string;
   private onCartSubmitted: InitParams['onCartSubmitted'];
   private spreedlyEnvironmentKey: string;
   private cartService: CartService;
   private googlePayInputParams: GooglePayInputParams;
-  private log: (...args: any) => void;
   private googlePayFinalPrice: number = 0;
   private googlePayFinalCurrency: string = 'USD';
   private googlePayShippingOptions: any[] = [];
+  private logger: Logger;
   private cartSubtotal: number | undefined;
   private cartCurrency: string = 'USD';
   private cartHasMultipleStores: boolean = false;
   private cartShippingMethods: ShippingMethod[] = [];
 
   constructor({
-    cartApiEndpoint,
+    cartService,
     googlePayInputParams,
+    logger,
     spreedlyEnvironmentKey,
-    log,
   }: GooglePayParams) {
-    this.cartApiEndpoint = cartApiEndpoint;
+    this.cartService = cartService;
     this.googlePayInputParams = googlePayInputParams;
     this.spreedlyEnvironmentKey = spreedlyEnvironmentKey;
-    this.log = log;
-    this.cartService = CartService.getInstance(this.cartApiEndpoint);
+    this.logger = logger;
   }
 
   /**
@@ -47,22 +47,19 @@ export class GooglePay {
    */
   loadGooglePay = async () => {
     try {
-      const getCartResponse = await this.cartService.getCart(
-        this.googlePayInputParams.cartId,
-        this.googlePayInputParams.shopperIp
-      );
+      const getCartResponse = await this.cartService.getCart(this.googlePayInputParams.cartId);
 
       this.cartSubtotal = Number(getCartResponse.cart.cost.subtotal.value) / 100;
       this.cartCurrency = getCartResponse.cart.cost.subtotal.currency;
       this.cartHasMultipleStores = getCartResponse.cart.stores.length > 1;
       const storeWithoutShippingMethod =
         getCartResponse.cart.stores.find(
-          (store: RyeStore) => !store.offer.selectedShippingMethod
+          (store: RyeStore) => !store.offer.selectedShippingMethod,
         ) ?? null;
 
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
-        this.log(
-          'Shipping methods need to be selected for all stores in cart to display Google Pay button.'
+        this.logger.error(
+          'Shipping methods need to be selected for all stores in cart to display Google Pay button.',
         );
       } else {
         // Show the Apple Pay button
@@ -76,7 +73,7 @@ export class GooglePay {
         };
       }
     } catch (error) {
-      this.log(`Error fetching cart cost: ${error}`);
+      this.logger.error(`Error fetching cart cost: ${error}`);
     }
   };
 
@@ -110,7 +107,7 @@ export class GooglePay {
     if (buttonContainer) {
       buttonContainer.appendChild(button);
     } else {
-      this.log('Google Pay button container not found');
+      this.logger.warn('Google Pay button container not found');
     }
   };
 
@@ -126,7 +123,6 @@ export class GooglePay {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
       shippingAddress!,
-      this.googlePayInputParams.shopperIp
     );
 
     return (
@@ -153,7 +149,7 @@ export class GooglePay {
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object or an empty object ({}) if none of the conditions are met.
    */
   private onPaymentDataChanged = async (
-    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData,
   ): Promise<google.payments.api.PaymentDataRequestUpdate> => {
     // If cart has multiple stores, we do not want to let users update shipping address or shipping options
     if (this.cartHasMultipleStores) {
@@ -187,7 +183,7 @@ export class GooglePay {
   private onGooglePayClicked = async (paymentsClient: google.payments.api.PaymentsClient) => {
     try {
       const paymentData = await paymentsClient.loadPaymentData(
-        this.getGooglePayPaymentDataRequest()
+        this.getGooglePayPaymentDataRequest(),
       );
 
       // Extract payment token from paymentData
@@ -203,7 +199,6 @@ export class GooglePay {
         const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
           this.googlePayInputParams.cartId,
           shippingAddress!,
-          this.googlePayInputParams.shopperIp
         );
 
         // Get the selected shipping option
@@ -211,7 +206,7 @@ export class GooglePay {
         selectedShippingOptions =
           updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
             const option = store.offer.shippingMethods.find(
-              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId,
             );
             return {
               store: store.store,
@@ -235,9 +230,8 @@ export class GooglePay {
         metadata: {
           cartId: this.googlePayInputParams.cartId,
           selectedShippingOptions: JSON.stringify(
-            this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
+            this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions,
           ),
-          shopperIp: this.googlePayInputParams.shopperIp,
         },
       };
 
@@ -248,7 +242,7 @@ export class GooglePay {
       this.onCartSubmitted?.(result.submitCart, result.errors, 'GOOGLE_PAY');
     } catch (error) {
       // Handle any errors that occur during the payment process
-      this.log('Payment failed: ', JSON.stringify(error));
+      this.logger.error('Payment failed: ', JSON.stringify(error));
     }
   };
 
@@ -261,15 +255,15 @@ export class GooglePay {
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object.
    */
   private onShippingOptionChanged = (
-    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData,
   ): google.payments.api.PaymentDataRequestUpdate => {
     // Calculate new total price based on selected shipping option
     this.googlePayFinalPrice = this.googlePayShippingOptions.find(
-      (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id
+      (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id,
     )?.finalValue;
 
     if (!this.googlePayFinalPrice) {
-      this.log('Unexpected error calculating updated price.');
+      this.logger.error('Unexpected error calculating updated price.');
     }
 
     return {
@@ -290,11 +284,11 @@ export class GooglePay {
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object.
    */
   private onShippingAddressChanged = async (
-    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData,
   ): Promise<google.payments.api.PaymentDataRequestUpdate> => {
     // Update shipping options based on the selected address
     const updatedShippingOptions = await this.getGooglePayShippingOptions(
-      intermediatePaymentData.shippingAddress!
+      intermediatePaymentData.shippingAddress!,
     );
 
     const defaultShipping = updatedShippingOptions[0];

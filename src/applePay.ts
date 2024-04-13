@@ -1,10 +1,12 @@
-import { CartService } from './cartService';
 import {
   APPLE_PAY_MERCHANT_IDENTIFIER,
   APPLE_PAY_SCRIPT_URL,
   APPLE_PAY_SERVER_URL,
   APPLE_PAY_VERSION,
 } from './constants';
+import { CartService } from './cartService';
+import { Logger } from './logger';
+
 import {
   ApplePayInputParams,
   InitParams,
@@ -14,11 +16,11 @@ import {
 import { ShippingMethod, RyeStore } from './types';
 
 export type ApplePayParams = {
-  cartApiEndpoint: string;
   applePayInputParams: ApplePayInputParams;
+  cartService: CartService;
+  logger: Logger;
   submitCart: (params: SubmitCartParams) => Promise<any>;
   onCartSubmitted: InitParams['onCartSubmitted'];
-  log: (...args: any) => void;
 };
 
 type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
@@ -37,10 +39,9 @@ type RyeAppleShippingMethod = ApplePayJS.ApplePayShippingMethod & {
 Pay, validating the merchant, selecting shipping options, selecting shipping methods, and
 authorizing payment. */
 export class ApplePay {
-  private cartApiEndpoint: string;
   private applePayInputParams: ApplePayInputParams;
   private onCartSubmitted: InitParams['onCartSubmitted'];
-  private log: (...args: any) => void;
+  private logger: Logger;
   private applePaySession: ApplePaySession | undefined;
   private shippingOptions: RyeAppleShippingMethod[] = [];
   private selectedShippingMethod: ApplePayJS.ApplePayShippingMethod | undefined;
@@ -55,12 +56,12 @@ export class ApplePay {
   private cartTotal: number | undefined;
   private cartId: string = '';
 
-  constructor({ cartApiEndpoint, applePayInputParams, onCartSubmitted, log }: ApplePayParams) {
-    this.cartApiEndpoint = cartApiEndpoint;
+  constructor({ applePayInputParams, cartService, logger, onCartSubmitted }: ApplePayParams) {
     this.applePayInputParams = applePayInputParams;
+    this.cartService = cartService;
+    this.logger = logger;
+
     this.onCartSubmitted = onCartSubmitted;
-    this.log = log;
-    this.cartService = CartService.getInstance(this.cartApiEndpoint);
   }
 
   /**
@@ -68,18 +69,18 @@ export class ApplePay {
    */
 
   loadApplePay = async () => {
-    const { cartId, variantId, shopperIp } = this.applePayInputParams;
+    const { cartId, variantId } = this.applePayInputParams;
 
     if (!cartId && !variantId) {
-      this.log('Cart ID or Variant ID must be provided');
+      this.logger.warn('Cart ID or Variant ID must be provided');
       return;
     }
 
     try {
       // Create cart if cartID was not provided and variantID was provided, otherwise fetch cart with the cartID
       const cartResponse = cartId
-        ? await this.cartService.getCart(cartId, shopperIp)
-        : await this.cartService.createCart(variantId!, shopperIp);
+        ? await this.cartService.getCart(cartId)
+        : await this.cartService.createCart(variantId!);
 
       // If Cart ID was provided, check if cart already has a shipping method selected
       if (
@@ -124,14 +125,14 @@ export class ApplePay {
 
       // Cart has multiple stores and at least one store does not have a shipping method selected
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
-        this.log(
-          'Shipping methods need to be selected for all stores in cart to display Apple Pay button.'
+        this.logger.warn(
+          'Shipping methods need to be selected for all stores in cart to display Apple Pay button.',
         );
       } else {
         this.loadApplePayScript();
       }
     } catch (error) {
-      this.log(`Error ${cartId ? 'fetching' : 'creating'} cart: ${error}`);
+      this.logger.error(`Error ${cartId ? 'fetching' : 'creating'} cart: ${error}`);
     }
   };
 
@@ -158,11 +159,11 @@ export class ApplePay {
             const button = document.createElement('apple-pay-button');
             button.setAttribute(
               'buttonstyle',
-              `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`
+              `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`,
             );
             button.setAttribute(
               'type',
-              `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`
+              `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`,
             );
             this.setApplePayStyles();
             button.onclick = async () => await this.onApplePayClicked();
@@ -170,10 +171,10 @@ export class ApplePay {
             if (buttonContainer) {
               buttonContainer.appendChild(button);
             } else {
-              this.log('Apple Pay button container not found');
+              this.logger.warn('Apple Pay button container not found');
             }
           }
-        }
+        },
       );
     }
   };
@@ -187,7 +188,7 @@ export class ApplePay {
   private onApplePayClicked = () => {
     // Check for ApplePaySession availability
     if (typeof ApplePaySession === 'undefined') {
-      this.log('Apple Pay is not available on this device/browser.');
+      this.logger.warn('Apple Pay is not available on this device/browser.');
       return;
     }
     // Define the Apple Pay payment request
@@ -258,7 +259,7 @@ export class ApplePay {
     try {
       this.applePaySession.begin();
     } catch (error) {
-      this.log('Apple Pay session failed:', error);
+      this.logger.error('Apple Pay session failed:', error);
     }
   };
 
@@ -286,7 +287,7 @@ export class ApplePay {
       const merchantValidationResult = await result.json();
       this.applePaySession?.completeMerchantValidation(merchantValidationResult);
     } catch (e) {
-      this.log('Merchant validation failed:', e);
+      this.logger.error('Merchant validation failed:', e);
     }
   };
 
@@ -299,7 +300,7 @@ export class ApplePay {
    * Pay checkout process.
    */
   private onShippingContactSelected = async (
-    event: ApplePayJS.ApplePayShippingContactSelectedEvent
+    event: ApplePayJS.ApplePayShippingContactSelectedEvent,
   ) => {
     const shippingAddress = event.shippingContact;
     this.shippingOptions = await this.getAppleShippingOptions(shippingAddress);
@@ -312,7 +313,7 @@ export class ApplePay {
       ApplePaySession.STATUS_SUCCESS,
       this.shippingOptions,
       newTotal,
-      [] // Apple Pay Line items to display on the pay sheet
+      [], // Apple Pay Line items to display on the pay sheet
     );
   };
 
@@ -328,13 +329,13 @@ export class ApplePay {
     this.selectedShippingMethod = event.shippingMethod;
     const selectedShippingOption =
       this.shippingOptions.find(
-        (option) => option.identifier === this.selectedShippingMethod?.identifier
+        (option) => option.identifier === this.selectedShippingMethod?.identifier,
       ) ?? this.shippingOptions?.at(0);
 
     const finalAmount = selectedShippingOption?.total.amount;
 
     if (!finalAmount) {
-      this.log('Error calculating total cost including shipping method');
+      this.logger.error('Error calculating total cost including shipping method');
       return;
     }
 
@@ -364,7 +365,7 @@ export class ApplePay {
     this.applePaySession?.completeShippingMethodSelection(
       ApplePaySession.STATUS_SUCCESS,
       newTotal,
-      newLineItems
+      newLineItems,
     );
   };
 
@@ -384,7 +385,6 @@ export class ApplePay {
       const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
         this.cartId,
         event.payment.shippingContact!,
-        this.applePayInputParams.shopperIp
       );
       const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
 
@@ -392,13 +392,13 @@ export class ApplePay {
         updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map(
           (store: RyeStore) => {
             const option = store.offer.shippingMethods.find(
-              (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId
+              (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId,
             );
             return {
               store: store.store,
               shippingId: option?.id,
             };
-          }
+          },
         );
     } else if (this.predefinedSelectedShippingMethod) {
       selectedShippingOptions = [
@@ -425,9 +425,8 @@ export class ApplePay {
       metadata: {
         cartId: this.cartId,
         selectedShippingOptions: JSON.stringify(
-          this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
+          this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions,
         ),
-        shopperIp: this.applePayInputParams.shopperIp,
       },
     };
 
@@ -440,7 +439,7 @@ export class ApplePay {
     const failedStore = result.submitCart.cart.stores[0].status === 'PAYMENT_FAILED';
 
     this.applePaySession?.completePayment(
-      result.error || failedStore ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
+      result.error || failedStore ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS,
     );
   };
 
@@ -454,11 +453,7 @@ export class ApplePay {
    * identifier, label, detail, amount, and total.
    */
   private getAppleShippingOptions = async (shippingAddress: ApplePayJS.ApplePayPaymentContact) => {
-    const content = await this.cartService.updateBuyerIdentity(
-      this.cartId,
-      shippingAddress,
-      this.applePayInputParams.shopperIp
-    );
+    const content = await this.cartService.updateBuyerIdentity(this.cartId, shippingAddress);
     const shippingOptions =
       content?.data?.updateCartBuyerIdentity?.cart?.stores
         ?.at(0)

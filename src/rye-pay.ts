@@ -1,7 +1,14 @@
 import { ApplePay } from './applePay';
 import { AuthService } from './authService';
+import { CartService } from './cartService';
 import { GooglePay } from './googlePay';
-import { RyeStore } from './types';
+import { Logger } from './logger';
+
+import { createDeferred } from './util/deferred';
+import { loadSpreedly, tryGetSpreedly } from './util/spreedly';
+import { RyePayError } from './errors';
+
+import type { GenerateJWTFunction, RyeStore } from './types';
 
 // Original Spreedly interface (only used api covered)
 interface Spreedly {
@@ -77,23 +84,18 @@ type FrameEventType =
   | 'escape'
   | 'tab'
   | 'shiftTab';
-type Environment = 'prod' | 'stage' | 'local';
 
 type PaymentTokenType = 'APPLE_PAY' | 'GOOGLE_PAY' | 'VAULT';
 
 // RyePay params for init method
 export interface InitParams extends SpreedlyInitParams {
   /**
-   * @deprecated Use `generateJWT` instead. This field will be removed in the next major release.
-   */
-  apiKey?: string;
-  /**
    * This method should hit an endpoint on your backend which generates a valid JWT
    * for use in frontend requests to the Rye API.
    *
    * @see https://docs.rye.com/jwt-authentication
    */
-  generateJWT?: () => Promise<string>;
+  generateJWT: GenerateJWTFunction;
   numberEl: string;
   cvvEl: string;
   onReady?: (spreedly: Spreedly) => void;
@@ -101,18 +103,22 @@ export interface InitParams extends SpreedlyInitParams {
   onCartSubmitted?: (
     submitCartResult?: SubmitCartResult,
     errors?: GraphQLError[],
-    paymentTokenType?: PaymentTokenType
+    paymentTokenType?: PaymentTokenType,
   ) => void;
   onIFrameError?: (error: FrameError) => void;
   onFieldChanged?: (
     name: FrameField,
     type: FrameEventType,
     activeEl: FrameField,
-    inputProperties: Partial<InputProperties>
+    inputProperties: Partial<InputProperties>,
   ) => void;
   onValidate?: (inputProperties: InputProperties) => void;
+  /**
+   * If `true`, then Rye Pay will log information to the console.
+   *
+   * Defaults to `true` when running in localhost; `false` otherwise.
+   */
   enableLogging?: boolean;
-  environment?: Environment;
   applePayInputParams?: ApplePayInputParams;
   googlePayInputParams?: GooglePayInputParams;
 }
@@ -120,11 +126,6 @@ export interface InitParams extends SpreedlyInitParams {
 export interface ApplePayInputParams {
   cartId?: string;
   variantId?: string;
-  /**
-   * @deprecated This field is not required when using JWT authentication.
-   * @see {@link InitParams.generateJWT}
-   */
-  shopperIp?: string;
   merchantDisplayName: string; // The merchant display name that appears on the Apple Pay sheet.
   merchantDomain: string; // The domain on which the Apple Pay button will appear on.
   displayShippingAddress: boolean;
@@ -161,11 +162,6 @@ export type ApplePayButtonStyles = {
 
 export interface GooglePayInputParams {
   cartId: string;
-  /**
-   * @deprecated This field is not required when using JWT authentication.
-   * @see {@link InitParams.generateJWT}
-   */
-  shopperIp: string;
 }
 
 interface SubmitAdditionalFields {
@@ -185,11 +181,6 @@ interface SubmitAdditionalFields {
 interface RyeSubmitAdditionalFields extends SubmitAdditionalFields {
   cartId: string;
   selectedShippingOptions?: SelectedShippingOption[];
-  /**
-   * @deprecated This field is not required when using JWT authentication.
-   * @see {@link InitParams.generateJWT}
-   */
-  shopperIp?: string;
   experimentalPromoCodes?: StorePromoCodes[];
 }
 
@@ -198,11 +189,6 @@ export interface SpreedlyAdditionalFields extends SubmitAdditionalFields {
   metadata: {
     cartId: string;
     selectedShippingOptions?: string;
-    /**
-     * @deprecated This field is not required when using JWT authentication.
-     * @see {@link InitParams.generateJWT}
-     */
-    shopperIp?: string;
     experimentalPromoCodes?: string;
   };
 }
@@ -370,11 +356,6 @@ export enum Marketplace {
   SHOPIFY = 'SHOPIFY',
 }
 
-const prodCartApiEndpoint =
-  process.env.CART_API_PRODUCTION_URL ?? 'https://graphql.api.rye.com/v1/query';
-const stageCartApiEndpoint =
-  process.env.CART_API_STAGING_URL ?? 'https://staging.beta.graphql.api.rye.com/v1/query';
-const localCartApiEndpoint = 'http://localhost:3000/v1/query';
 export const ryeShopperIpHeaderKey = 'x-rye-shopper-ip';
 
 export const cartSubmitResponse = `
@@ -415,134 +396,127 @@ errors {
 }
 `;
 
+type ReadyState =
+  | { status: 'idle' }
+  | { status: 'initializing'; promise: Promise<void> }
+  | { status: 'initialized' };
+
 export class RyePay {
-  private initializing = false;
-  private readonly spreedlyScriptUrl = 'https://core.spreedly.com/iframe/iframe-v1.min.js';
+  /**
+   * Indicates whether Rye Pay has been initialized.
+   */
+  get initialized() {
+    return this.readyState.status === 'initialized';
+  }
+
+  private readyState: ReadyState = { status: 'idle' };
   private readonly submitCartMutation = `mutation submitCart($input: CartSubmitInput!) { submitCart(input: $input) { ${cartSubmitResponse} } } `;
   private readonly envTokenQuery = `query {
     environmentToken {
        token
     }
   }`;
-  private cartApiEndpoint = prodCartApiEndpoint;
-  private spreedly!: Spreedly;
-  private enableLogging: boolean = false;
+
   private authService!: AuthService;
   private envToken = '';
-
-  /**
-   * Indicates whether the RyePay has been initialized.
-   */
-  public initialized = false;
-
+  private logger = new Logger();
   private initParams: InitParams | undefined;
 
   /**
-   * Initializes RyePay. This method should be called before calling any other methods of RyePay.
+   * Initializes Rye Pay.
+   *
+   * This method should be called before calling any other methods of Rye Pay.
    */
-  init(params: InitParams) {
+  init(params: InitParams): Promise<void> {
     this.initParams = params;
+
     const {
-      apiKey,
       generateJWT,
       numberEl,
       cvvEl,
       onErrors,
-      enableLogging = false,
-      environment = 'prod',
+      enableLogging,
       applePayInputParams,
       googlePayInputParams,
     } = params;
-    if (this.initializing) {
-      return;
-    }
-    if (this.initialized) {
-      this.reload();
-      return;
-    }
-    this.initializing = true;
-    this.authService = AuthService.getInstance();
-    this.envToken = '';
 
-    if (!apiKey && !generateJWT) {
-      const errorMsg = 'Either apiKey or generateJWT must be provided';
+    if (this.readyState.status === 'initializing') {
+      return this.readyState.promise;
+    }
+    if (this.readyState.status === 'initialized') {
+      this.reload();
+      return Promise.resolve();
+    }
+
+    if (!generateJWT) {
+      const errorMsg = 'The `generateJWT` must be provided when initializing Rye Pay.';
       if (onErrors) {
         onErrors([
-          {
-            attribute: 'apiKey',
-            key: 'errors.blank',
-            message: errorMsg,
-          },
           {
             attribute: 'generateJWT',
             key: 'errors.blank',
             message: errorMsg,
           },
         ]);
-        return;
+        return Promise.resolve();
       }
-      throw new Error(errorMsg);
+
+      throw new RyePayError({
+        code: 'INVALID_CONFIG',
+        message: errorMsg,
+      });
     }
 
-    // Set the API Key or JWT Generator in the AuthService
-    if (params.apiKey) {
-      this.authService.setApiKey(params.apiKey);
-    }
-    if (params.generateJWT) {
-      this.authService.setGenerateJWT(params.generateJWT);
-    }
-
-    if (this.hasSpreedlyGlobal()) {
-      return;
-    }
-
-    this.enableLogging = enableLogging;
-    this.cartApiEndpoint = this.getCartApiEndpoint(environment);
-
-    const script = document.createElement('script');
-    document.head.appendChild(script);
-
-    const scriptLoadingErrorMsg = 'error loading Spreedly';
-    script.onerror = () => {
-      throw new Error(scriptLoadingErrorMsg);
+    const deferred = createDeferred();
+    this.readyState = {
+      status: 'initializing',
+      promise: deferred.promise,
     };
-    script.onload = async () => {
-      if (!this.hasSpreedlyGlobal()) {
-        throw new Error(scriptLoadingErrorMsg);
-      }
 
-      this.spreedly = (globalThis as any).Spreedly;
-      this.envToken = await this.getEnvToken();
-      this.log(`envToken: ${this.envToken}`);
-      this.subscribeToEvents(params);
+    this.authService = AuthService.getInstance(generateJWT);
+    this.envToken = '';
 
-      this.spreedly.init(this.envToken, {
-        numberEl,
-        cvvEl,
+    if (typeof enableLogging === 'boolean') {
+      this.logger.setEnabled(enableLogging);
+    }
+
+    loadSpreedly()
+      .then(async (spreedly) => {
+        this.envToken = await this.getEnvToken();
+        this.subscribeToEvents(params);
+
+        spreedly.init(this.envToken, {
+          numberEl,
+          cvvEl,
+        });
+
+        this.readyState = { status: 'initialized' };
+        this.logger.log('Spreedly initialized');
+
+        deferred.resolve();
+      })
+      .catch((error) => {
+        throw new RyePayError({
+          cause: error,
+          code: 'LOAD_FAILED',
+          message: 'Error loading Spreedly',
+        });
       });
 
-      this.initializing = false;
-      this.initialized = true;
-      this.log('Spreedly initialized');
-    };
-
-    // trigger script loading
-    script.src = this.spreedlyScriptUrl;
-
-    this.log('RyePay initialized');
+    const cartService = new CartService(this.authService);
 
     // Initialize GooglePay if the button is present
     if (document.getElementById('rye-google-pay')) {
       // If GooglePayInputParams are not set, google pay cannot be instantiated
       if (!googlePayInputParams) {
-        this.log('googlePayInputParams must be provided');
+        this.logger.warn('googlePayInputParams must be provided');
       } else {
         const googlePay = new GooglePay({
-          cartApiEndpoint: this.cartApiEndpoint,
-          googlePayInputParams: googlePayInputParams,
+          cartService,
+          googlePayInputParams,
+          logger: this.logger,
           spreedlyEnvironmentKey: this.envToken,
           onCartSubmitted: params.onCartSubmitted,
-          log: this.log,
         });
 
         googlePay.loadGooglePay();
@@ -553,19 +527,21 @@ export class RyePay {
     if (document.getElementById('rye-apple-pay')) {
       // If ApplePayInputParams are not set, apple pay cannot be instantiated
       if (!applePayInputParams) {
-        this.log('applePayInputParams must be provided');
+        this.logger.warn('applePayInputParams must be provided');
       } else {
         const applePay = new ApplePay({
-          cartApiEndpoint: this.cartApiEndpoint,
-          applePayInputParams: applePayInputParams,
+          applePayInputParams,
+          cartService,
+          logger: this.logger,
           submitCart: this.submitCart,
           onCartSubmitted: params.onCartSubmitted,
-          log: this.log,
         });
 
         applePay.loadApplePay();
       }
     }
+
+    return deferred.promise;
   }
 
   private subscribeToEvents({
@@ -576,40 +552,41 @@ export class RyePay {
     onErrors,
     onCartSubmitted,
   }: InitParams) {
-    this.spreedly.removeHandlers();
+    const spreedly = this.assertSpreedly();
+
+    spreedly.removeHandlers();
     // Subscribe to optional events only if developers wants to handle them
-    onReady && this.spreedly.on('ready', () => onReady(this.spreedly));
-    onFieldChanged && this.spreedly.on('fieldEvent', onFieldChanged);
-    onValidate && this.spreedly.on('validation', onValidate);
-    onIFrameError && this.spreedly.on('consoleError', onIFrameError);
-    onErrors && this.spreedly.on('errors', onErrors);
+    onReady && spreedly.on('ready', () => onReady(spreedly));
+    onFieldChanged && spreedly.on('fieldEvent', onFieldChanged);
+    onValidate && spreedly.on('validation', onValidate);
+    onIFrameError && spreedly.on('consoleError', onIFrameError);
+    onErrors && spreedly.on('errors', onErrors);
 
     // Triggers after tokenizeCreditCard was called
-    this.spreedly.on(
+    spreedly.on(
       'paymentMethod',
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
-        this.log(`payment method token: ${token}`);
         const result = await this.submitCart({ token, paymentDetails });
         onCartSubmitted?.(result.submitCart, result.errors, 'VAULT');
-      }
+      },
     );
   }
 
   /**
    * Submits payment details to Rye API. As an intermediate step, the method tokenizes credit card data using Spreedly service.
-   * @param paymentDetails
    */
   submit(paymentDetails: RyeSubmitAdditionalFields) {
     if (!paymentDetails.cartId) {
       throw new Error('cartId must be provided');
     }
 
-    this.spreedly.tokenizeCreditCard({
+    const spreedly = this.assertSpreedly('submit');
+
+    spreedly.tokenizeCreditCard({
       ...paymentDetails,
       metadata: {
         cartId: paymentDetails.cartId,
         selectedShippingOptions: JSON.stringify(paymentDetails.selectedShippingOptions ?? []),
-        shopperIp: paymentDetails.shopperIp,
         experimentalPromoCodes: JSON.stringify(paymentDetails.experimentalPromoCodes),
       },
     });
@@ -620,7 +597,9 @@ export class RyePay {
    * When reload is complete, the ready event will be fired, at which time the iFrame can be customized.
    */
   reload() {
-    this.spreedly.reload();
+    const spreedly = this.assertSpreedly('reload');
+
+    spreedly.reload();
     if (this.initParams) {
       this.subscribeToEvents(this.initParams);
     }
@@ -630,7 +609,8 @@ export class RyePay {
    * Request iFrame fields to report their validation status. Useful for real-time validation functionality.
    */
   validate() {
-    this.spreedly.validate();
+    const spreedly = this.assertSpreedly('validate');
+    spreedly.validate();
   }
 
   // Field customization methods
@@ -639,21 +619,24 @@ export class RyePay {
    * Style iFrame fields using CSS.
    */
   setStyle(field: FrameField, style: string) {
-    this.spreedly.setStyle(field, style);
+    const spreedly = this.assertSpreedly('setStyle');
+    spreedly.setStyle(field, style);
   }
 
   /**
    * Set the input type of the iFrame fields. This is useful to when you want different keyboards to display on mobile devices.
    */
   setFieldType(field: FrameField, type: FieldType) {
-    this.spreedly.setFieldType(field, type);
+    const spreedly = this.assertSpreedly('setFieldType');
+    spreedly.setFieldType(field, type);
   }
 
   /**
    * Style iFrame fields’ label. Although the label for each iFrame field is not displayed, it is still used by screen readers and other accessibility devices.
    */
   setLabel(field: FrameField, label: string) {
-    this.spreedly.setLabel(field, label);
+    const spreedly = this.assertSpreedly('setLabel');
+    spreedly.setLabel(field, label);
   }
 
   /**
@@ -661,21 +644,24 @@ export class RyePay {
    * it can still be used by screen readers and other accessibility devices.
    */
   setTitle(field: FrameField, title: string) {
-    this.spreedly.setTitle(field, title);
+    const spreedly = this.assertSpreedly('setTitle');
+    spreedly.setTitle(field, title);
   }
 
   /**
    * Style iFrame fields’ placeholder text.
    */
   setPlaceholder(field: FrameField, placeholder: string) {
-    this.spreedly.setPlaceholder(field, placeholder);
+    const spreedly = this.assertSpreedly('setPlaceholder');
+    spreedly.setPlaceholder(field, placeholder);
   }
 
   /**
    * Set the value the iFrame fields to a known test value. Any values that are not on the allowed list will be silently rejected.
    */
   setValue(field: FrameField, value: number) {
-    this.spreedly.setValue(field, value);
+    const spreedly = this.assertSpreedly('setValue');
+    spreedly.setValue(field, value);
   }
 
   /**
@@ -683,7 +669,8 @@ export class RyePay {
    * The number field must be set to type text or tel for pretty formatting to take effect.
    */
   setNumberFormat(format: NumberFormat) {
-    this.spreedly.setNumberFormat(format);
+    const spreedly = this.assertSpreedly('setNumberFormat');
+    spreedly.setNumberFormat(format);
   }
 
   /**
@@ -691,7 +678,8 @@ export class RyePay {
    * By default, the autocomplete attribute is enabled, so the first call of this function will disable autocomplete
    */
   toggleAutoComplete() {
-    this.spreedly.toggleAutoComplete();
+    const spreedly = this.assertSpreedly('toggleAutoComplete');
+    spreedly.toggleAutoComplete();
   }
 
   /**
@@ -699,15 +687,17 @@ export class RyePay {
    * or if you want to auto-focus one of the iFrame fields if they contain an input error.
    */
   transferFocus(field: FrameField) {
-    this.spreedly.transferFocus(field);
+    const spreedly = this.assertSpreedly('transferFocus');
+    spreedly.transferFocus(field);
   }
 
   private getEnvToken = async () => {
-    const rawResponse = await fetch(this.cartApiEndpoint, {
+    const requestOptions = await this.authService.makeRequestOptions();
+    const rawResponse = await fetch(requestOptions.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: await this.authService.getAuthHeader(),
+        ...requestOptions.headers,
       },
       body: JSON.stringify({
         query: this.envTokenQuery,
@@ -742,18 +732,14 @@ export class RyePay {
         : undefined,
     };
 
-    const headers: RequestInit['headers'] = {
-      'Content-Type': 'application/json',
-      Authorization: await this.authService.getAuthHeader(),
-    };
+    const requestOptions = await this.authService.makeRequestOptions();
 
-    if (paymentDetails.metadata.shopperIp) {
-      headers[ryeShopperIpHeaderKey] = paymentDetails.metadata.shopperIp;
-    }
-
-    const rawResponse = await fetch(this.cartApiEndpoint, {
+    const rawResponse = await fetch(requestOptions.url, {
       method: 'POST',
-      headers,
+      headers: {
+        ...requestOptions.headers,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         query: this.submitCartMutation,
         variables: {
@@ -769,22 +755,17 @@ export class RyePay {
     return result;
   }
 
-  private hasSpreedlyGlobal() {
-    return !!(globalThis as any).Spreedly;
-  }
-
-  private log = (...args: any) => {
-    this.enableLogging && console.log(...args);
-  };
-
-  private getCartApiEndpoint(env: Environment) {
-    switch (env) {
-      case 'local':
-        return localCartApiEndpoint;
-      case 'stage':
-        return stageCartApiEndpoint;
-      default:
-        return prodCartApiEndpoint;
+  private assertSpreedly(method?: string) {
+    const spreedly = tryGetSpreedly();
+    if (!spreedly) {
+      throw new RyePayError({
+        code: 'NOT_READY',
+        message: method
+          ? `The ${method} method was called before Spreedly was initialized. Make sure to call the \`init\` method first, and wait for the returned promise to resolve.`
+          : 'Rye Pay encountered an internal error when trying to access Spreedly. This is a bug in Rye Pay. Please open a ticket at https://github.com/rye-com/rye-pay.',
+      });
     }
+
+    return spreedly;
   }
 }

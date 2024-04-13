@@ -4,13 +4,13 @@ const POSTAL_CODE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // List of possible le
 const POSTAL_CODE_DIGITS = '0123456789'; // List of possible digits in Canada / UK postal codes
 
 export function isApplePayAddress(
-  address: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact
+  address: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
 ): address is ApplePayJS.ApplePayPaymentContact {
   return 'givenName' in address;
 }
 
 export function isGooglePayAddress(
-  address: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact
+  address: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
 ): address is google.payments.api.Address {
   return 'name' in address;
 }
@@ -29,7 +29,7 @@ Once the payment is authorized, the real postal code can be accessed, so the del
 ***/
 export async function generateFullPostalCode(
   postalCode: string,
-  countryCode: string
+  countryCode: string,
 ): Promise<string> {
   if (countryCode === 'CA') {
     return await getFullPostalCodeForCanada(postalCode);

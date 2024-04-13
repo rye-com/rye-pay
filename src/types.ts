@@ -1,3 +1,5 @@
+export type Environment = 'production' | 'staging' | 'local';
+
 export type RyeStore = {
   store: string;
   offer: {
@@ -25,3 +27,5 @@ export type ShippingMethod = {
     displayValue: string;
   };
 };
+
+export type GenerateJWTFunction = () => PromiseLike<string>;
