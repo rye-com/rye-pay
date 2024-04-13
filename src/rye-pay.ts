@@ -103,14 +103,14 @@ export interface InitParams extends SpreedlyInitParams {
   onCartSubmitted?: (
     submitCartResult?: SubmitCartResult,
     errors?: GraphQLError[],
-    paymentTokenType?: PaymentTokenType
+    paymentTokenType?: PaymentTokenType,
   ) => void;
   onIFrameError?: (error: FrameError) => void;
   onFieldChanged?: (
     name: FrameField,
     type: FrameEventType,
     activeEl: FrameField,
-    inputProperties: Partial<InputProperties>
+    inputProperties: Partial<InputProperties>,
   ) => void;
   onValidate?: (inputProperties: InputProperties) => void;
   /**
@@ -568,7 +568,7 @@ export class RyePay {
       async (token: string, paymentDetails: SpreedlyAdditionalFields) => {
         const result = await this.submitCart({ token, paymentDetails });
         onCartSubmitted?.(result.submitCart, result.errors, 'VAULT');
-      }
+      },
     );
   }
 

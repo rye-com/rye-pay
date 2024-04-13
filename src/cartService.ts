@@ -124,7 +124,7 @@ export class CartService {
    */
   public async updateBuyerIdentity(
     cartId: string,
-    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact
+    shippingAddress: google.payments.api.Address | ApplePayJS.ApplePayPaymentContact,
   ) {
     const countryCode = shippingAddress?.countryCode ?? '';
     const postalCode = await generateFullPostalCode(shippingAddress?.postalCode ?? '', countryCode);

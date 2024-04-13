@@ -30,9 +30,9 @@ describe('AuthService', () => {
             aud: 'not-a-valid-aud',
           },
           'secret',
-          { algorithm: 'HS256' }
-        )
-      )
+          { algorithm: 'HS256' },
+        ),
+      ),
     );
 
     await expectRyePayError('BAD_AUTHORIZATION', authService.makeRequestOptions());

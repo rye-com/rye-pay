@@ -17,7 +17,7 @@ describe('util/deferred', () => {
         .catch(() => {
           expect(1).toBe(1);
         });
-    }
+    },
   );
 
   it('can resolve the promise', async ({ expect }) => {

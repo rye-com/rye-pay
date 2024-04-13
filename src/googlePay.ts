@@ -54,12 +54,12 @@ export class GooglePay {
       this.cartHasMultipleStores = getCartResponse.cart.stores.length > 1;
       const storeWithoutShippingMethod =
         getCartResponse.cart.stores.find(
-          (store: RyeStore) => !store.offer.selectedShippingMethod
+          (store: RyeStore) => !store.offer.selectedShippingMethod,
         ) ?? null;
 
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
         this.logger.error(
-          'Shipping methods need to be selected for all stores in cart to display Google Pay button.'
+          'Shipping methods need to be selected for all stores in cart to display Google Pay button.',
         );
       } else {
         // Show the Apple Pay button
@@ -122,7 +122,7 @@ export class GooglePay {
   private getGooglePayShippingOptions = async (shippingAddress: google.payments.api.Address) => {
     const content = await this.cartService.updateBuyerIdentity(
       this.googlePayInputParams.cartId,
-      shippingAddress!
+      shippingAddress!,
     );
 
     return (
@@ -149,7 +149,7 @@ export class GooglePay {
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object or an empty object ({}) if none of the conditions are met.
    */
   private onPaymentDataChanged = async (
-    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData,
   ): Promise<google.payments.api.PaymentDataRequestUpdate> => {
     // If cart has multiple stores, we do not want to let users update shipping address or shipping options
     if (this.cartHasMultipleStores) {
@@ -183,7 +183,7 @@ export class GooglePay {
   private onGooglePayClicked = async (paymentsClient: google.payments.api.PaymentsClient) => {
     try {
       const paymentData = await paymentsClient.loadPaymentData(
-        this.getGooglePayPaymentDataRequest()
+        this.getGooglePayPaymentDataRequest(),
       );
 
       // Extract payment token from paymentData
@@ -198,7 +198,7 @@ export class GooglePay {
         // Update buyer identity with the complete shipping address
         const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
           this.googlePayInputParams.cartId,
-          shippingAddress!
+          shippingAddress!,
         );
 
         // Get the selected shipping option
@@ -206,7 +206,7 @@ export class GooglePay {
         selectedShippingOptions =
           updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map((store: any) => {
             const option = store.offer.shippingMethods.find(
-              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId
+              (shippingMethod: any) => shippingMethod.id === selectedShippingOptionId,
             );
             return {
               store: store.store,
@@ -230,7 +230,7 @@ export class GooglePay {
         metadata: {
           cartId: this.googlePayInputParams.cartId,
           selectedShippingOptions: JSON.stringify(
-            this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
+            this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions,
           ),
         },
       };
@@ -255,11 +255,11 @@ export class GooglePay {
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object.
    */
   private onShippingOptionChanged = (
-    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData,
   ): google.payments.api.PaymentDataRequestUpdate => {
     // Calculate new total price based on selected shipping option
     this.googlePayFinalPrice = this.googlePayShippingOptions.find(
-      (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id
+      (option: any) => option.id === intermediatePaymentData.shippingOptionData?.id,
     )?.finalValue;
 
     if (!this.googlePayFinalPrice) {
@@ -284,11 +284,11 @@ export class GooglePay {
    * @returns a Promise that resolves to a `google.payments.api.PaymentDataRequestUpdate` object.
    */
   private onShippingAddressChanged = async (
-    intermediatePaymentData: google.payments.api.IntermediatePaymentData
+    intermediatePaymentData: google.payments.api.IntermediatePaymentData,
   ): Promise<google.payments.api.PaymentDataRequestUpdate> => {
     // Update shipping options based on the selected address
     const updatedShippingOptions = await this.getGooglePayShippingOptions(
-      intermediatePaymentData.shippingAddress!
+      intermediatePaymentData.shippingAddress!,
     );
 
     const defaultShipping = updatedShippingOptions[0];

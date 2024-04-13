@@ -9,8 +9,8 @@ describe('RyePayError', () => {
         new RyePayError({
           code: 'BAD_AUTHORIZATION',
           message: '',
-        })
-      )
+        }),
+      ),
     ).toBe(true);
   });
 
@@ -28,7 +28,7 @@ describe('RyePayError', () => {
     });
 
     expect(JSON.stringify(error)).toMatchInlineSnapshot(
-      `"{"code":"INTERNAL","message":"Something went wrong","name":"RyePayError"}"`
+      `"{"code":"INTERNAL","message":"Something went wrong","name":"RyePayError"}"`,
     );
   });
 });

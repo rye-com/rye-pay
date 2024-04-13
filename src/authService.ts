@@ -61,7 +61,7 @@ export class AuthService {
     try {
       const data = jwtDecode(jwt);
       const environment = Object.values(config.environments).find(
-        (env) => env.audience === data.aud
+        (env) => env.audience === data.aud,
       );
 
       if (environment) {
@@ -72,7 +72,7 @@ export class AuthService {
       throw new RyePayError({
         code: 'BAD_AUTHORIZATION',
         message: `The provided JWT token does not match any known Rye API environment. The \`aud\` field of your JWT must be one of the following values: ${validAudienceValues.join(
-          ', '
+          ', ',
         )}`,
       });
     } catch (error) {

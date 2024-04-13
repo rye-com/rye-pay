@@ -126,7 +126,7 @@ export class ApplePay {
       // Cart has multiple stores and at least one store does not have a shipping method selected
       if (this.cartHasMultipleStores && storeWithoutShippingMethod) {
         this.logger.warn(
-          'Shipping methods need to be selected for all stores in cart to display Apple Pay button.'
+          'Shipping methods need to be selected for all stores in cart to display Apple Pay button.',
         );
       } else {
         this.loadApplePayScript();
@@ -159,11 +159,11 @@ export class ApplePay {
             const button = document.createElement('apple-pay-button');
             button.setAttribute(
               'buttonstyle',
-              `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`
+              `${this.applePayInputParams.applePayButtonStyles?.buttonColor ?? 'black'}`,
             );
             button.setAttribute(
               'type',
-              `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`
+              `${this.applePayInputParams.applePayButtonStyles?.buttonType ?? 'buy'}`,
             );
             this.setApplePayStyles();
             button.onclick = async () => await this.onApplePayClicked();
@@ -174,7 +174,7 @@ export class ApplePay {
               this.logger.warn('Apple Pay button container not found');
             }
           }
-        }
+        },
       );
     }
   };
@@ -300,7 +300,7 @@ export class ApplePay {
    * Pay checkout process.
    */
   private onShippingContactSelected = async (
-    event: ApplePayJS.ApplePayShippingContactSelectedEvent
+    event: ApplePayJS.ApplePayShippingContactSelectedEvent,
   ) => {
     const shippingAddress = event.shippingContact;
     this.shippingOptions = await this.getAppleShippingOptions(shippingAddress);
@@ -313,7 +313,7 @@ export class ApplePay {
       ApplePaySession.STATUS_SUCCESS,
       this.shippingOptions,
       newTotal,
-      [] // Apple Pay Line items to display on the pay sheet
+      [], // Apple Pay Line items to display on the pay sheet
     );
   };
 
@@ -329,7 +329,7 @@ export class ApplePay {
     this.selectedShippingMethod = event.shippingMethod;
     const selectedShippingOption =
       this.shippingOptions.find(
-        (option) => option.identifier === this.selectedShippingMethod?.identifier
+        (option) => option.identifier === this.selectedShippingMethod?.identifier,
       ) ?? this.shippingOptions?.at(0);
 
     const finalAmount = selectedShippingOption?.total.amount;
@@ -365,7 +365,7 @@ export class ApplePay {
     this.applePaySession?.completeShippingMethodSelection(
       ApplePaySession.STATUS_SUCCESS,
       newTotal,
-      newLineItems
+      newLineItems,
     );
   };
 
@@ -384,7 +384,7 @@ export class ApplePay {
     if (!this.cartHasMultipleStores && !this.predefinedSelectedShippingMethod) {
       const updateBuyerIdentityResponse = await this.cartService.updateBuyerIdentity(
         this.cartId,
-        event.payment.shippingContact!
+        event.payment.shippingContact!,
       );
       const selectedShippingOptionId = this.selectedShippingMethod?.identifier;
 
@@ -392,13 +392,13 @@ export class ApplePay {
         updateBuyerIdentityResponse.data.updateCartBuyerIdentity.cart.stores.map(
           (store: RyeStore) => {
             const option = store.offer.shippingMethods.find(
-              (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId
+              (shippingMethod: ShippingMethod) => shippingMethod.id === selectedShippingOptionId,
             );
             return {
               store: store.store,
               shippingId: option?.id,
             };
-          }
+          },
         );
     } else if (this.predefinedSelectedShippingMethod) {
       selectedShippingOptions = [
@@ -425,7 +425,7 @@ export class ApplePay {
       metadata: {
         cartId: this.cartId,
         selectedShippingOptions: JSON.stringify(
-          this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions
+          this.cartHasMultipleStores ? this.cartShippingMethods : selectedShippingOptions,
         ),
       },
     };
@@ -439,7 +439,7 @@ export class ApplePay {
     const failedStore = result.submitCart.cart.stores[0].status === 'PAYMENT_FAILED';
 
     this.applePaySession?.completePayment(
-      result.error || failedStore ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS
+      result.error || failedStore ? ApplePaySession.STATUS_FAILURE : ApplePaySession.STATUS_SUCCESS,
     );
   };
 
